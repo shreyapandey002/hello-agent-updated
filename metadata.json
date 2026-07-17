@@ -1,0 +1,6 @@
+{
+  "name": "Hello Agent",
+  "description": "Email-native AI agents for business workflows. Create dedicated email identities that receive emails, process attachments, and prepare drafts or handoffs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
