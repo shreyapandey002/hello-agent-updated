@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 type BookingPayload = {
   full_name?: unknown;
   work_email?: unknown;
@@ -117,6 +119,60 @@ const validateBookingPayload = (payload: BookingPayload) => {
   return '';
 };
 
+const buildAgentPayload = (payload: BookingPayload) => ({
+  output_type: 'text',
+  input_type: 'chat',
+  input_value: JSON.stringify({
+    full_name: getStringField(payload, 'full_name'),
+    work_email: getStringField(payload, 'work_email'),
+    company_name: getStringField(payload, 'company_name'),
+    primary_email_workflow: getStringField(payload, 'primary_email_workflow'),
+    monthly_email_volume: getStringField(payload, 'monthly_email_volume'),
+    use_case: getStringField(payload, 'use_case'),
+    consultation_date: getStringField(payload, 'consultation_date'),
+    consultation_time: getStringField(payload, 'consultation_time'),
+  }),
+  session_id: randomUUID(),
+});
+
+const extractAgentMessage = (data: unknown): string => {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+
+    for (const key of ['output', 'message', 'response', 'result', 'text']) {
+      const value = record[key];
+
+      if (typeof value === 'string') {
+        return value;
+      }
+
+      if (value && typeof value === 'object') {
+        const nested = value as Record<string, unknown>;
+
+        if (typeof nested.text === 'string') {
+          return nested.text;
+        }
+
+        if (typeof nested.message === 'string') {
+          return nested.message;
+        }
+
+        if (typeof nested.output === 'string') {
+          return nested.output;
+        }
+      }
+    }
+
+    return JSON.stringify(data);
+  }
+
+  return 'Booking request received successfully';
+};
+
 export const handler = async (event: NetlifyEvent): Promise<NetlifyResponse> => {
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -144,5 +200,43 @@ export const handler = async (event: NetlifyEvent): Promise<NetlifyResponse> => 
     return jsonResponse(400, validationMessage);
   }
 
-  return jsonResponse(200, 'Booking request received successfully', true);
+  const ottom8ApiKey = process.env.OTTOM8_API_KEY;
+
+  if (!ottom8ApiKey) {
+    return jsonResponse(500, 'Booking service is not configured');
+  }
+
+  try {
+    const agentResponse = await fetch('https://ottom8.nhtech.link/api/v1/run/56c53e70-9d3d-4632-9034-e0f0acf6e0db?stream=false', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ottom8ApiKey,
+      },
+      body: JSON.stringify(buildAgentPayload(payload)),
+    });
+
+    if (!agentResponse.ok) {
+      return jsonResponse(500, 'Booking could not be processed at this time');
+    }
+
+    let agentData: unknown;
+    try {
+      agentData = await agentResponse.json();
+    } catch {
+      agentData = await agentResponse.text();
+    }
+
+    return {
+      statusCode: 200,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        success: true,
+        message: extractAgentMessage(agentData),
+        agentResponse: agentData,
+      }),
+    };
+  } catch {
+    return jsonResponse(500, 'Booking could not be processed at this time');
+  }
 };
