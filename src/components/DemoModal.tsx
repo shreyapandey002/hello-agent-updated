@@ -586,7 +586,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
   return (
     <AnimatePresence>
-      <div id="demo-modal-container" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div id="demo-modal-container" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
         {/* Backdrop */}
         <motion.div
           id="demo-modal-backdrop"
@@ -603,7 +603,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className={`relative w-full max-w-xl max-h-[calc(100vh-40px)] overflow-y-auto rounded-2xl border p-8 sm:p-10 shadow-2xl transition-colors duration-300 z-10 ${
+          className={`relative mx-4 box-border w-[calc(100%-2rem)] max-w-xl max-h-[calc(100vh-40px)] overflow-y-auto rounded-2xl border p-5 shadow-2xl transition-colors duration-300 z-10 sm:p-10 ${
             isDark 
               ? 'bg-slate-900 border-slate-800 text-white shadow-black/80 ring-1 ring-blue-500/10' 
               : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
@@ -635,7 +635,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                 <h3 className={`font-display text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Book a Hello Agent demo
                 </h3>
-                <p className={`text-xs sm:text-sm leading-normal ${isDark ? 'text-slate-450' : 'text-slate-500'}`}>
+                <p className={`max-w-full break-words text-xs leading-relaxed sm:text-sm ${isDark ? 'text-slate-450' : 'text-slate-500'}`}>
                   Let us show you how to automate your specific email-heavy workflows with absolute precision.
                 </p>
               </div>
@@ -650,7 +650,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Aditi Jha"
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                    className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
                       isDark 
                         ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
                         : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
@@ -667,7 +667,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="you@company.com"
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                    className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
                       isDark 
                         ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
                         : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
@@ -684,7 +684,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.company}
                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     placeholder="Acme Logistics or Global Corp"
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                    className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
                       isDark 
                         ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
                         : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
@@ -692,44 +692,46 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="workflow-select" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Primary Email Workflow</label>
-                  <select
-                    id="workflow-select"
-                    value={formData.workflow}
-                    onChange={(e) => setFormData({ ...formData, workflow: e.target.value })}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
-                      isDark 
-                        ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
-                        : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
-                    }`}
-                  >
-                    <option value="Operations">Operations / Logistics</option>
-                    <option value="Support">Customer Support</option>
-                    <option value="Sales">Sales Vetting & Leads</option>
-                    <option value="Finance">Finance / Invoices</option>
-                    <option value="HR">HR / Candidate Review</option>
-                    <option value="Other">Other Custom Workflow</option>
-                  </select>
-                </div>
+                <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="workflow-select" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Primary Email Workflow</label>
+                    <select
+                      id="workflow-select"
+                      value={formData.workflow}
+                      onChange={(e) => setFormData({ ...formData, workflow: e.target.value })}
+                      className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                        isDark 
+                          ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
+                          : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
+                      }`}
+                    >
+                      <option value="Operations">Operations / Logistics</option>
+                      <option value="Support">Customer Support</option>
+                      <option value="Sales">Sales Vetting & Leads</option>
+                      <option value="Finance">Finance / Invoices</option>
+                      <option value="HR">HR / Candidate Review</option>
+                      <option value="Other">Other Custom Workflow</option>
+                    </select>
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="volume-select" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Monthly Email Volume</label>
-                  <select
-                    id="volume-select"
-                    value={formData.volume}
-                    onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
-                      isDark 
-                        ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
-                        : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
-                    }`}
-                  >
-                    <option value="Under 100">Under 100 emails/month</option>
-                    <option value="100 - 500">100 - 500 emails/month</option>
-                    <option value="500 - 2,500">500 - 2,500 emails/month</option>
-                    <option value="Over 2,500">Over 2,500 emails/month</option>
-                  </select>
+                  <div className="space-y-1.5">
+                    <label htmlFor="volume-select" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Monthly Email Volume</label>
+                    <select
+                      id="volume-select"
+                      value={formData.volume}
+                      onChange={(e) => setFormData({ ...formData, volume: e.target.value })}
+                      className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                        isDark 
+                          ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
+                          : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
+                      }`}
+                    >
+                      <option value="Under 100">Under 100 emails/month</option>
+                      <option value="100 - 500">100 - 500 emails/month</option>
+                      <option value="500 - 2,500">500 - 2,500 emails/month</option>
+                      <option value="Over 2,500">Over 2,500 emails/month</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div ref={datePickerRef} className="space-y-1.5">
@@ -740,7 +742,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                       type="button"
                       onClick={openDatePicker}
                       aria-expanded={isDatePickerOpen}
-                      className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm font-medium focus:outline-none transition-colors duration-300 ${
+                      className={`box-border flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm font-medium focus:outline-none transition-colors duration-300 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500'
                           : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
@@ -753,7 +755,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isDatePickerOpen && (
-                      <div className={`absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border p-3 shadow-2xl sm:p-4 ${
+                      <div className={`absolute left-0 right-0 top-full z-50 mt-2 box-border w-full max-w-[calc(100vw-2rem)] rounded-2xl border p-3 shadow-2xl sm:p-4 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
                           : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
@@ -823,7 +825,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                       type="button"
                       onClick={openTimePicker}
                       aria-expanded={isTimePickerOpen}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm focus:outline-none transition-colors duration-300 ${
+                      className={`box-border w-full rounded-lg border px-3 py-2 text-left text-sm focus:outline-none transition-colors duration-300 ${
                         isDark 
                           ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
                           : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
@@ -835,7 +837,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isTimePickerOpen && (
-                      <div className={`absolute right-0 bottom-full z-30 mb-2 w-[min(360px,calc(100vw-48px))] rounded-3xl border p-4 shadow-2xl sm:p-5 ${
+                      <div className={`absolute left-0 right-0 bottom-full z-30 mb-2 box-border w-full max-w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-3xl border p-4 shadow-2xl sm:left-auto sm:right-0 sm:w-[min(360px,calc(100vw-2rem))] sm:p-5 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
                           : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
@@ -859,7 +861,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                             <div
                               ref={hourWheelRef}
                               onScroll={() => handleWheelScroll(hourWheelRef.current, getAllowedHourOptions(draftTime.period as 'AM' | 'PM'), 'hour')}
-                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                              className={`time-wheel-scroll min-w-0 h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
                                 isDark ? 'bg-slate-900/80' : 'bg-slate-50'
                               }`}
                             >
@@ -881,7 +883,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                             <div
                               ref={minuteWheelRef}
                               onScroll={() => handleWheelScroll(minuteWheelRef.current, getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM'), 'minute')}
-                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                              className={`time-wheel-scroll min-w-0 h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
                                 isDark ? 'bg-slate-900/80' : 'bg-slate-50'
                               }`}
                             >
@@ -903,7 +905,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                             <div
                               ref={periodWheelRef}
                               onScroll={() => handleWheelScroll(periodWheelRef.current, timePickerPeriods, 'period')}
-                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                              className={`time-wheel-scroll min-w-0 h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
                                 isDark ? 'bg-slate-900/80' : 'bg-slate-50'
                               }`}
                             >
@@ -966,7 +968,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="e.g. We want an agent to read incoming vendor invoices, verify totals, and update the ERP status."
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none transition-colors duration-300 ${
+                    className={`box-border w-full rounded-lg border px-3 py-2 text-sm focus:outline-none resize-none transition-colors duration-300 ${
                       isDark 
                         ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
                         : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
