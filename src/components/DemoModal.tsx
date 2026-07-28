@@ -112,6 +112,25 @@ const isValidPickerTime = (value: string) => {
   return hourNumber >= 0 && hourNumber <= 23 && timePickerMinutes.includes(minute);
 };
 
+const extractErrorMessage = (body: string, fallback: string) => {
+  if (!body) return fallback;
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+
+    for (const key of ['message', 'error', 'detail', 'details']) {
+      const value = parsed[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value;
+      }
+    }
+  } catch {
+    // Ignore parse errors and fall back to the provided fallback message.
+  }
+
+  return fallback;
+};
+
 export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -224,22 +243,13 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       });
 
       const responseText = await response.text();
-      let result: Record<string, unknown> = {};
+      console.log('Booking response status', response.status);
+      console.log('Booking response body', responseText);
 
-      try {
-        result = responseText ? JSON.parse(responseText) : {};
-      } catch {
-        result = {};
-      }
-
-      const agentValue = (result.output as { data?: { value?: { response?: { successful?: boolean }; recipient?: string } } } | undefined)?.data?.value
-        ?? (result as { output?: { value?: { response?: { successful?: boolean }; recipient?: string } } }).output?.value
-        ?? (result as { value?: { response?: { successful?: boolean }; recipient?: string } }).value;
-      const isConfirmed = agentValue?.response?.successful === true;
-
-      if (!response.ok || !isConfirmed) {
+      if (!response.ok) {
+        const errorMessage = extractErrorMessage(responseText, response.statusText || 'Please try again.');
         setBookingOutcome('error');
-        setSubmitError(result.message ? String(result.message) : 'Please try again.');
+        setSubmitError(errorMessage);
         setStep(2);
         return;
       }
@@ -405,7 +415,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className={`relative w-full max-w-lg overflow-visible rounded-2xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 z-10 ${
+          className={`relative w-full max-w-lg max-h-[calc(100vh-40px)] overflow-y-auto rounded-2xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 z-10 ${
             isDark 
               ? 'bg-slate-900 border-slate-800 text-white shadow-black/80 ring-1 ring-blue-500/10' 
               : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
@@ -555,7 +565,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isDatePickerOpen && (
-                      <div className={`absolute left-0 right-0 top-full z-50 mt-2 max-h-[320px] overflow-y-auto rounded-2xl border p-3 shadow-2xl sm:p-4 ${
+                      <div className={`absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border p-3 shadow-2xl sm:p-4 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
                           : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
