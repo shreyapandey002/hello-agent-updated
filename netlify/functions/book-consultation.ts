@@ -32,21 +32,25 @@ const requiredFields = [
   'consultation_time',
 ] as const;
 
-const allowedConsultationTimes = new Set([
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-  '19:00',
-  '20:00',
-  '21:00',
-]);
+// Booking window: 09:00 through 22:00 inclusive, any minute allowed,
+// except the final hour (22:xx) which only permits the exact top of
+// the hour, since a consultation can't start after the closing bound.
+// This mirrors the frontend's `isWithinBookingWindow` check in
+// DemoModal.tsx -- keep the two in sync if either changes.
+const isValidConsultationTime = (value: string) => {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return false;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return false;
+  if (minute < 0 || minute > 59) return false;
+  if (hour < 9 || hour > 22) return false;
+  if (hour === 22 && minute !== 0) return false;
+
+  return true;
+};
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -112,8 +116,8 @@ const validateBookingPayload = (payload: BookingPayload) => {
     return 'consultation_date must be today or later';
   }
 
-  if (!allowedConsultationTimes.has(consultationTime)) {
-    return 'consultation_time must be between 09:00 and 21:00';
+  if (!isValidConsultationTime(consultationTime)) {
+    return 'consultation_time must be between 09:00 and 22:00';
   }
 
   return '';
