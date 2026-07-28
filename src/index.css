@@ -13,3 +13,11 @@
   --color-brand-700: #004d99;
 }
 
+.time-wheel-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.time-wheel-scroll::-webkit-scrollbar {
+  display: none;
+}

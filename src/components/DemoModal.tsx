@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, Sparkles, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
@@ -11,6 +11,7 @@ interface DemoModalProps {
 const timePickerHours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 const timePickerMinutes = ['00', '15', '30', '45'];
 const timePickerPeriods = ['AM', 'PM'];
+const timePickerItemHeight = 44;
 
 const getTodayDateString = () => {
   const today = new Date();
@@ -83,6 +84,38 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     minute: '00',
     period: 'AM',
   });
+  const timePickerRef = useRef<HTMLDivElement>(null);
+  const hourWheelRef = useRef<HTMLDivElement>(null);
+  const minuteWheelRef = useRef<HTMLDivElement>(null);
+  const periodWheelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isTimePickerOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!timePickerRef.current?.contains(event.target as Node)) {
+        setIsTimePickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [isTimePickerOpen]);
+
+  useEffect(() => {
+    if (!isTimePickerOpen) return;
+
+    requestAnimationFrame(() => {
+      scrollWheelToValue(hourWheelRef.current, timePickerHours, draftTime.hour);
+      scrollWheelToValue(minuteWheelRef.current, timePickerMinutes, draftTime.minute);
+      scrollWheelToValue(periodWheelRef.current, timePickerPeriods, draftTime.period);
+    });
+  }, [draftTime.hour, draftTime.minute, draftTime.period, isTimePickerOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,11 +224,62 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     setIsTimePickerOpen(false);
   };
 
-  const getWheelOptionClassName = (isSelected: boolean) => `flex h-9 w-full items-center justify-center rounded-md text-sm font-semibold transition-all ${
-    isSelected
-      ? isDark ? 'bg-blue-600 text-white shadow-sm' : 'bg-blue-600 text-white shadow-sm'
-      : isDark ? 'text-slate-500 hover:text-slate-200' : 'text-slate-400 hover:text-slate-700'
-  }`;
+  const scrollWheelToValue = (element: HTMLDivElement | null, values: string[], value: string) => {
+    if (!element) return;
+
+    const index = Math.max(values.indexOf(value), 0);
+    element.scrollTo({
+      top: index * timePickerItemHeight,
+      behavior: 'auto',
+    });
+  };
+
+  const handleWheelScroll = (
+    element: HTMLDivElement | null,
+    values: string[],
+    field: 'hour' | 'minute' | 'period',
+  ) => {
+    if (!element) return;
+
+    const selectedIndex = Math.min(
+      values.length - 1,
+      Math.max(0, Math.round(element.scrollTop / timePickerItemHeight)),
+    );
+
+    const selectedValue = values[selectedIndex];
+
+    if (draftTime[field] !== selectedValue) {
+      setDraftTime((currentDraft) => ({
+        ...currentDraft,
+        [field]: selectedValue,
+      }));
+    }
+  };
+
+  const selectWheelValue = (
+    element: HTMLDivElement | null,
+    values: string[],
+    field: 'hour' | 'minute' | 'period',
+    value: string,
+  ) => {
+    setDraftTime((currentDraft) => ({
+      ...currentDraft,
+      [field]: value,
+    }));
+    scrollWheelToValue(element, values, value);
+  };
+
+  const getWheelOptionClassName = (isSelected: boolean, distance: number) => {
+    const fadeClass = distance === 1
+      ? isDark ? 'text-slate-400' : 'text-slate-500'
+      : isDark ? 'text-slate-600' : 'text-slate-350';
+
+    return `flex h-11 w-full shrink-0 snap-center items-center justify-center rounded-lg text-sm font-bold transition-all ${
+      isSelected
+        ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/40'
+        : `${fadeClass} hover:text-blue-500`
+    }`;
+  };
 
   if (!isOpen) return null;
 
@@ -218,7 +302,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className={`relative w-full max-w-lg overflow-hidden rounded-2xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 z-10 ${
+          className={`relative w-full max-w-lg overflow-visible rounded-2xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 z-10 ${
             isDark 
               ? 'bg-slate-900 border-slate-800 text-white shadow-black/80 ring-1 ring-blue-500/10' 
               : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
@@ -366,11 +450,12 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
                 <div className="space-y-1.5">
                   <label htmlFor="consultation-time-trigger" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Consultation Time</label>
-                  <div className="relative">
+                  <div ref={timePickerRef} className="relative">
                     <button
                       id="consultation-time-trigger"
                       type="button"
                       onClick={openTimePicker}
+                      aria-expanded={isTimePickerOpen}
                       className={`w-full rounded-lg border px-3 py-2 text-left text-sm focus:outline-none transition-colors duration-300 ${
                         isDark 
                           ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
@@ -383,74 +468,105 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isTimePickerOpen && (
-                      <div className={`absolute right-0 top-full z-20 mt-2 w-full min-w-[260px] rounded-xl border p-3 shadow-2xl ${
+                      <div className={`absolute right-0 bottom-full z-30 mb-2 w-[min(360px,calc(100vw-48px))] rounded-2xl border p-3 shadow-2xl sm:p-4 ${
                         isDark
-                          ? 'border-slate-800 bg-slate-950 text-white shadow-black/70'
-                          : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/40'
+                          ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
+                          : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
                       }`}>
-                        <div className={`pointer-events-none absolute left-3 right-3 top-[76px] h-9 rounded-lg border ${
-                          isDark ? 'border-blue-500/40 bg-blue-500/10' : 'border-blue-200 bg-blue-50'
-                        }`} />
-
-                        <div className="relative grid grid-cols-3 gap-2">
-                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
-                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
-                          }`}>
-                            {timePickerHours.map((hour) => (
-                              <button
-                                key={hour}
-                                type="button"
-                                onClick={() => setDraftTime({ ...draftTime, hour })}
-                                className={getWheelOptionClassName(draftTime.hour === hour)}
-                              >
-                                {hour}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
-                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
-                          }`}>
-                            {timePickerMinutes.map((minute) => (
-                              <button
-                                key={minute}
-                                type="button"
-                                onClick={() => setDraftTime({ ...draftTime, minute })}
-                                className={getWheelOptionClassName(draftTime.minute === minute)}
-                              >
-                                {minute}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
-                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
-                          }`}>
-                            {timePickerPeriods.map((period) => (
-                              <button
-                                key={period}
-                                type="button"
-                                onClick={() => setDraftTime({ ...draftTime, period })}
-                                className={getWheelOptionClassName(draftTime.period === period)}
-                              >
-                                {period}
-                              </button>
-                            ))}
-                          </div>
+                        <div className="grid grid-cols-3 gap-2 px-1 pb-2 text-center text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500">
+                          <span>Hours</span>
+                          <span>Minutes</span>
+                          <span>AM/PM</span>
                         </div>
 
-                        <div className={`pointer-events-none absolute inset-x-3 top-3 h-12 rounded-t-lg bg-gradient-to-b ${
-                          isDark ? 'from-slate-950 to-slate-950/0' : 'from-white to-white/0'
-                        }`} />
-                        <div className={`pointer-events-none absolute inset-x-3 bottom-[52px] h-12 rounded-b-lg bg-gradient-to-t ${
-                          isDark ? 'from-slate-950 to-slate-950/0' : 'from-white to-white/0'
-                        }`} />
+                        <div className="relative">
+                          <div className={`pointer-events-none absolute left-0 right-0 top-1/2 z-0 h-11 -translate-y-1/2 rounded-xl border ${
+                            isDark ? 'border-blue-500/25 bg-blue-500/10' : 'border-blue-200 bg-blue-50'
+                          }`} />
 
-                        <div className="relative mt-3 flex justify-end gap-2">
+                          <div className="relative z-10 grid grid-cols-3 gap-2">
+                            <div
+                              ref={hourWheelRef}
+                              onScroll={() => handleWheelScroll(hourWheelRef.current, timePickerHours, 'hour')}
+                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                                isDark ? 'bg-slate-900/80' : 'bg-slate-50'
+                              }`}
+                            >
+                              {timePickerHours.map((hour, index) => {
+                                const selectedIndex = timePickerHours.indexOf(draftTime.hour);
+                                return (
+                                  <button
+                                    key={hour}
+                                    type="button"
+                                    onClick={() => selectWheelValue(hourWheelRef.current, timePickerHours, 'hour', hour)}
+                                    className={getWheelOptionClassName(draftTime.hour === hour, Math.abs(index - selectedIndex))}
+                                  >
+                                    {hour}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div
+                              ref={minuteWheelRef}
+                              onScroll={() => handleWheelScroll(minuteWheelRef.current, timePickerMinutes, 'minute')}
+                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                                isDark ? 'bg-slate-900/80' : 'bg-slate-50'
+                              }`}
+                            >
+                              {timePickerMinutes.map((minute, index) => {
+                                const selectedIndex = timePickerMinutes.indexOf(draftTime.minute);
+                                return (
+                                  <button
+                                    key={minute}
+                                    type="button"
+                                    onClick={() => selectWheelValue(minuteWheelRef.current, timePickerMinutes, 'minute', minute)}
+                                    className={getWheelOptionClassName(draftTime.minute === minute, Math.abs(index - selectedIndex))}
+                                  >
+                                    {minute}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div
+                              ref={periodWheelRef}
+                              onScroll={() => handleWheelScroll(periodWheelRef.current, timePickerPeriods, 'period')}
+                              className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
+                                isDark ? 'bg-slate-900/80' : 'bg-slate-50'
+                              }`}
+                            >
+                              {timePickerPeriods.map((period, index) => {
+                                const selectedIndex = timePickerPeriods.indexOf(draftTime.period);
+                                return (
+                                  <button
+                                    key={period}
+                                    type="button"
+                                    onClick={() => selectWheelValue(periodWheelRef.current, timePickerPeriods, 'period', period)}
+                                    className={getWheelOptionClassName(draftTime.period === period, Math.abs(index - selectedIndex))}
+                                  >
+                                    {period}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className={`pointer-events-none absolute inset-x-0 top-0 z-20 h-14 rounded-t-xl bg-gradient-to-b ${
+                            isDark ? 'from-slate-950 via-slate-950/90 to-slate-950/0' : 'from-white via-white/90 to-white/0'
+                          }`} />
+                          <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 h-14 rounded-b-xl bg-gradient-to-t ${
+                            isDark ? 'from-slate-950 via-slate-950/90 to-slate-950/0' : 'from-white via-white/90 to-white/0'
+                          }`} />
+                        </div>
+
+                        <div className={`mt-4 flex items-center justify-between border-t pt-3 ${
+                          isDark ? 'border-slate-800' : 'border-slate-200'
+                        }`}>
                           <button
                             type="button"
                             onClick={() => setIsTimePickerOpen(false)}
-                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                            className={`rounded-lg border px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                               isDark
                                 ? 'border-slate-800 text-slate-300 hover:bg-slate-900 hover:text-white'
                                 : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
@@ -461,7 +577,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                           <button
                             type="button"
                             onClick={saveTimePicker}
-                            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700 cursor-pointer"
+                            className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700 cursor-pointer"
                           >
                             Save
                           </button>
