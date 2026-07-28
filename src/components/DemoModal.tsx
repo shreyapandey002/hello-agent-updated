@@ -8,9 +8,60 @@ interface DemoModalProps {
   onClose: () => void;
 }
 
+const timePickerHours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+const timePickerMinutes = ['00', '15', '30', '45'];
+const timePickerPeriods = ['AM', 'PM'];
+
+const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toTwentyFourHourTime = (hour: string, minute: string, period: string) => {
+  const hourNumber = Number(hour);
+  const adjustedHour = period === 'PM'
+    ? hourNumber === 12 ? 12 : hourNumber + 12
+    : hourNumber === 12 ? 0 : hourNumber;
+
+  return `${String(adjustedHour).padStart(2, '0')}:${minute}`;
+};
+
+const parseTwentyFourHourTime = (value: string) => {
+  const [hour = '09', minute = '00'] = value.split(':');
+  const hourNumber = Number(hour);
+  const period = hourNumber >= 12 ? 'PM' : 'AM';
+  const displayHour = hourNumber % 12 || 12;
+
+  return {
+    hour: String(displayHour).padStart(2, '0'),
+    minute: timePickerMinutes.includes(minute) ? minute : '00',
+    period,
+  };
+};
+
+const formatDisplayTime = (value: string) => {
+  if (!value) return 'Select a start time';
+
+  const { hour, minute, period } = parseTwentyFourHourTime(value);
+  return `${hour}:${minute} ${period}`;
+};
+
+const isValidPickerTime = (value: string) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+
+  const [hour, minute] = value.split(':');
+  const hourNumber = Number(hour);
+
+  return hourNumber >= 0 && hourNumber <= 23 && timePickerMinutes.includes(minute);
+};
+
 export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const todayDate = getTodayDateString();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({
@@ -19,17 +70,81 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     company: '',
     workflow: 'Operations',
     volume: '100 - 500 emails/month',
+    consultationDate: '',
+    consultationTime: '',
     notes: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [draftTime, setDraftTime] = useState({
+    hour: '09',
+    minute: '00',
+    period: 'AM',
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    if (isSubmitting) return;
+
+    setSubmitError('');
+    setSubmitMessage('');
+
+    if (formData.consultationDate < todayDate) {
+      setSubmitError('Please choose a consultation date today or later.');
+      return;
+    }
+
+    if (!isValidPickerTime(formData.consultationTime)) {
+      setSubmitError('Please choose a consultation time.');
+      return;
+    }
+
+    const bookingApiUrl = import.meta.env.VITE_BOOKING_API_URL;
+
+    if (!bookingApiUrl) {
+      setSubmitError('Booking is not configured yet. Please add VITE_BOOKING_API_URL.');
+      return;
+    }
+
+    const payload = {
+      full_name: formData.name,
+      work_email: formData.email,
+      company_name: formData.company,
+      primary_email_workflow: formData.workflow,
+      monthly_email_volume: formData.volume,
+      use_case: formData.notes,
+      consultation_date: formData.consultationDate,
+      consultation_time: formData.consultationTime,
+    };
+
+    try {
+      setIsSubmitting(true);
+
+      const response = await fetch(bookingApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseText = await response.text();
+      const result = responseText ? JSON.parse(responseText) : {};
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'We could not book that consultation. Please try another slot.');
+      }
+
+      setSubmitMessage(result.message || 'Consultation booked successfully');
       setStep(2);
-    }, 1200);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Something went wrong while booking your consultation.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -40,7 +155,17 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       company: '',
       workflow: 'Operations',
       volume: '100 - 500 emails/month',
+      consultationDate: '',
+      consultationTime: '',
       notes: ''
+    });
+    setSubmitMessage('');
+    setSubmitError('');
+    setIsTimePickerOpen(false);
+    setDraftTime({
+      hour: '09',
+      minute: '00',
+      period: 'AM',
     });
   };
 
@@ -48,6 +173,29 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     resetForm();
     onClose();
   };
+
+  const openTimePicker = () => {
+    setDraftTime(formData.consultationTime ? parseTwentyFourHourTime(formData.consultationTime) : {
+      hour: '09',
+      minute: '00',
+      period: 'AM',
+    });
+    setIsTimePickerOpen(true);
+  };
+
+  const saveTimePicker = () => {
+    setFormData({
+      ...formData,
+      consultationTime: toTwentyFourHourTime(draftTime.hour, draftTime.minute, draftTime.period),
+    });
+    setIsTimePickerOpen(false);
+  };
+
+  const getWheelOptionClassName = (isSelected: boolean) => `flex h-9 w-full items-center justify-center rounded-md text-sm font-semibold transition-all ${
+    isSelected
+      ? isDark ? 'bg-blue-600 text-white shadow-sm' : 'bg-blue-600 text-white shadow-sm'
+      : isDark ? 'text-slate-500 hover:text-slate-200' : 'text-slate-400 hover:text-slate-700'
+  }`;
 
   if (!isOpen) return null;
 
@@ -199,6 +347,130 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   </select>
                 </div>
 
+                <div className="space-y-1.5">
+                  <label htmlFor="consultation-date-input" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Consultation Date</label>
+                  <input
+                    id="consultation-date-input"
+                    type="date"
+                    required
+                    min={todayDate}
+                    value={formData.consultationDate}
+                    onChange={(e) => setFormData({ ...formData, consultationDate: e.target.value })}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
+                      isDark 
+                        ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
+                        : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="consultation-time-trigger" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Consultation Time</label>
+                  <div className="relative">
+                    <button
+                      id="consultation-time-trigger"
+                      type="button"
+                      onClick={openTimePicker}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm focus:outline-none transition-colors duration-300 ${
+                        isDark 
+                          ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500' 
+                          : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
+                      }`}
+                    >
+                      <span className={formData.consultationTime ? '' : isDark ? 'text-slate-650' : 'text-slate-450'}>
+                        {formatDisplayTime(formData.consultationTime)}
+                      </span>
+                    </button>
+
+                    {isTimePickerOpen && (
+                      <div className={`absolute right-0 top-full z-20 mt-2 w-full min-w-[260px] rounded-xl border p-3 shadow-2xl ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-950 text-white shadow-black/70'
+                          : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/40'
+                      }`}>
+                        <div className={`pointer-events-none absolute left-3 right-3 top-[76px] h-9 rounded-lg border ${
+                          isDark ? 'border-blue-500/40 bg-blue-500/10' : 'border-blue-200 bg-blue-50'
+                        }`} />
+
+                        <div className="relative grid grid-cols-3 gap-2">
+                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
+                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
+                          }`}>
+                            {timePickerHours.map((hour) => (
+                              <button
+                                key={hour}
+                                type="button"
+                                onClick={() => setDraftTime({ ...draftTime, hour })}
+                                className={getWheelOptionClassName(draftTime.hour === hour)}
+                              >
+                                {hour}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
+                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
+                          }`}>
+                            {timePickerMinutes.map((minute) => (
+                              <button
+                                key={minute}
+                                type="button"
+                                onClick={() => setDraftTime({ ...draftTime, minute })}
+                                className={getWheelOptionClassName(draftTime.minute === minute)}
+                              >
+                                {minute}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className={`h-36 overflow-y-auto rounded-lg px-1 py-[54px] ${
+                            isDark ? 'bg-slate-900/70' : 'bg-slate-50'
+                          }`}>
+                            {timePickerPeriods.map((period) => (
+                              <button
+                                key={period}
+                                type="button"
+                                onClick={() => setDraftTime({ ...draftTime, period })}
+                                className={getWheelOptionClassName(draftTime.period === period)}
+                              >
+                                {period}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className={`pointer-events-none absolute inset-x-3 top-3 h-12 rounded-t-lg bg-gradient-to-b ${
+                          isDark ? 'from-slate-950 to-slate-950/0' : 'from-white to-white/0'
+                        }`} />
+                        <div className={`pointer-events-none absolute inset-x-3 bottom-[52px] h-12 rounded-b-lg bg-gradient-to-t ${
+                          isDark ? 'from-slate-950 to-slate-950/0' : 'from-white to-white/0'
+                        }`} />
+
+                        <div className="relative mt-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsTimePickerOpen(false)}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                              isDark
+                                ? 'border-slate-800 text-slate-300 hover:bg-slate-900 hover:text-white'
+                                : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveTimePicker}
+                            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700 cursor-pointer"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 sm:col-span-2">
                   <label htmlFor="notes-textarea" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Describe your use case (optional)</label>
                   <textarea
@@ -217,6 +489,16 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
               </div>
 
               <div id="demo-modal-footer" className="pt-2 flex flex-col gap-3">
+                {submitError && (
+                  <div className={`rounded-lg border px-3 py-2 text-xs leading-normal ${
+                    isDark
+                      ? 'border-red-500/30 bg-red-950/40 text-red-200'
+                      : 'border-red-200 bg-red-50 text-red-700'
+                  }`}>
+                    {submitError}
+                  </div>
+                )}
+
                 <button
                   id="submit-booking-btn"
                   type="submit"
@@ -224,7 +506,10 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-3 px-4 shadow-md transition-all disabled:opacity-70 cursor-pointer"
                 >
                   {isSubmitting ? (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <>
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Booking consultation...</span>
+                    </>
                   ) : (
                     <>
                       <span>Book Implementation Consultation</span>
@@ -250,7 +535,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   Consultation Booked!
                 </h3>
                 <p className={`mx-auto max-w-sm text-xs sm:text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Thank you, <span className="font-semibold text-blue-600">{formData.name}</span>. We have scheduled a demonstration tailored to <span className="font-semibold text-blue-600">{formData.company}</span>&apos;s email operations.
+                  {submitMessage || 'Consultation booked successfully'}. Thank you, <span className="font-semibold text-blue-600">{formData.name}</span>. We have scheduled a demonstration tailored to <span className="font-semibold text-blue-600">{formData.company}</span>&apos;s email operations.
                 </p>
               </div>
 
