@@ -135,7 +135,6 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [bookingOutcome, setBookingOutcome] = useState<'idle' | 'success' | 'error'>('idle');
-  const [confirmationRecipient, setConfirmationRecipient] = useState('');
   const [draftTime, setDraftTime] = useState({
     hour: '09',
     minute: '00',
@@ -240,18 +239,17 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
       if (!response.ok || !isConfirmed) {
         setBookingOutcome('error');
-        setConfirmationRecipient(formData.email);
+        setSubmitError(result.message ? String(result.message) : 'Please try again.');
         setStep(2);
         return;
       }
 
-      setSubmitMessage('Consultation booked successfully');
       setBookingOutcome('success');
-      setConfirmationRecipient(agentValue?.recipient || formData.email);
+      setSubmitMessage('Please check your email.');
       setStep(2);
-    } catch {
+    } catch (error) {
       setBookingOutcome('error');
-      setConfirmationRecipient(formData.email);
+      setSubmitError(error instanceof Error ? error.message : 'Please try again.');
       setStep(2);
     } finally {
       setIsSubmitting(false);
@@ -273,7 +271,6 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     setSubmitMessage('');
     setSubmitError('');
     setBookingOutcome('idle');
-    setConfirmationRecipient('');
     setIsTimePickerOpen(false);
     setIsDatePickerOpen(false);
     setDraftTime({
@@ -558,7 +555,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isDatePickerOpen && (
-                      <div className={`absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border p-3 shadow-2xl sm:p-4 ${
+                      <div className={`absolute left-0 right-0 top-full z-50 mt-2 max-h-[320px] overflow-y-auto rounded-2xl border p-3 shadow-2xl sm:p-4 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
                           : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
@@ -822,34 +819,11 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
                   <div className="space-y-3">
                     <h3 className={`font-display text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      Consultation Booked!
+                      Booking Confirmed
                     </h3>
                     <p className={`mx-auto max-w-sm text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Thanks, {formData.name}. Your consultation has been requested.
+                      Please check your email.
                     </p>
-                  </div>
-
-                  <div className={`rounded-2xl border p-5 text-left space-y-4 transition-colors duration-300 ${
-                    isDark ? 'border-slate-800 bg-slate-950/80' : 'border-slate-200 bg-slate-50'
-                  }`}>
-                    <div className="space-y-1">
-                      <p className={`text-xs font-bold uppercase tracking-widest font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Booking Details</p>
-                      <p className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{formatFullDateDisplay(formData.consultationDate)}</p>
-                      <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{formatDisplayTime(formData.consultationTime)}</p>
-                    </div>
-
-                    <div className="space-y-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
-                      <p className={`text-xs font-bold uppercase tracking-widest font-mono ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>Confirmation</p>
-                      <p className={`text-sm leading-normal ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        We&apos;ll send the confirmation to:
-                      </p>
-                      <a
-                        href={`mailto:${confirmationRecipient || formData.email}`}
-                        className="text-sm font-semibold text-blue-500 hover:text-blue-400"
-                      >
-                        {confirmationRecipient || formData.email}
-                      </a>
-                    </div>
                   </div>
 
                   <button
@@ -875,7 +849,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                       Something went wrong
                     </h3>
                     <p className={`mx-auto max-w-sm text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      We couldn&apos;t send your consultation confirmation. Please try again.
+                      {submitError || 'Please try again.'}
                     </p>
                   </div>
 
@@ -884,6 +858,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                       id="retry-booking-btn"
                       onClick={() => {
                         setBookingOutcome('idle');
+                        setSubmitError('');
                         setStep(1);
                       }}
                       className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-blue-700 cursor-pointer"
