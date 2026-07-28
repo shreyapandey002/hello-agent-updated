@@ -201,9 +201,18 @@ export const handler = async (event: NetlifyEvent): Promise<NetlifyResponse> => 
   }
 
   const ottom8ApiKey = process.env.OTTOM8_API_KEY;
+  console.error('OTTOM8_API_KEY exists', Boolean(ottom8ApiKey));
 
   if (!ottom8ApiKey) {
-    return jsonResponse(500, 'Booking service is not configured');
+    return {
+      statusCode: 500,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        success: false,
+        message: 'Ottom8 agent request failed',
+        details: 'Missing OTTOM8_API_KEY environment variable',
+      }),
+    };
   }
 
   try {
@@ -216,15 +225,28 @@ export const handler = async (event: NetlifyEvent): Promise<NetlifyResponse> => 
       body: JSON.stringify(buildAgentPayload(payload)),
     });
 
+    const responseText = await agentResponse.text();
+    console.error('Ottom8 HTTP status', agentResponse.status);
+    console.error('Ottom8 response body', responseText);
+
     if (!agentResponse.ok) {
-      return jsonResponse(500, 'Booking could not be processed at this time');
+      return {
+        statusCode: 500,
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          success: false,
+          message: 'Ottom8 agent call failed',
+          status: agentResponse.status,
+          details: responseText,
+        }),
+      };
     }
 
     let agentData: unknown;
     try {
-      agentData = await agentResponse.json();
+      agentData = JSON.parse(responseText);
     } catch {
-      agentData = await agentResponse.text();
+      agentData = responseText;
     }
 
     return {
@@ -236,7 +258,16 @@ export const handler = async (event: NetlifyEvent): Promise<NetlifyResponse> => 
         agentResponse: agentData,
       }),
     };
-  } catch {
-    return jsonResponse(500, 'Booking could not be processed at this time');
+  } catch (error) {
+    console.error('Caught error message', error instanceof Error ? error.message : String(error));
+    return {
+      statusCode: 500,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        success: false,
+        message: 'Ottom8 agent request failed',
+        details: error instanceof Error ? error.message : String(error),
+      }),
+    };
   }
 };
