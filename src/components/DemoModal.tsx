@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, Sparkles, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, Calendar, Sparkles, CheckCircle2, ArrowRight, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 
 interface DemoModalProps {
@@ -50,6 +50,59 @@ const formatDisplayTime = (value: string) => {
   return `${hour}:${minute} ${period}`;
 };
 
+const formatDisplayDate = (value: string) => {
+  if (!value) return 'Select a consultation date';
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatFullDateDisplay = (value: string) => {
+  if (!value) return 'Select a consultation date';
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const parseDateValue = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const getCalendarDays = (month: Date) => {
+  const year = month.getFullYear();
+  const currentMonth = month.getMonth();
+  const firstDayOfMonth = new Date(year, currentMonth, 1);
+  const daysInMonth = new Date(year, currentMonth + 1, 0).getDate();
+  const startDay = firstDayOfMonth.getDay();
+  const cells: Array<{ value: string; isCurrentMonth: boolean; isDisabled: boolean }> = [];
+
+  for (let index = 0; index < 42; index += 1) {
+    const dayOffset = index - startDay + 1;
+    const date = new Date(year, currentMonth, dayOffset);
+    const dateValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const isCurrentMonth = date.getMonth() === currentMonth;
+    const isDisabled = date < parseDateValue(getTodayDateString());
+
+    cells.push({ value: dateValue, isCurrentMonth, isDisabled });
+  }
+
+  return cells;
+};
+
 const isValidPickerTime = (value: string) => {
   if (!/^\d{2}:\d{2}$/.test(value)) return false;
 
@@ -79,22 +132,28 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   const [submitMessage, setSubmitMessage] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [bookingOutcome, setBookingOutcome] = useState<'idle' | 'success' | 'error'>('idle');
+  const [confirmationRecipient, setConfirmationRecipient] = useState('');
   const [draftTime, setDraftTime] = useState({
     hour: '09',
     minute: '00',
     period: 'AM',
   });
   const timePickerRef = useRef<HTMLDivElement>(null);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const hourWheelRef = useRef<HTMLDivElement>(null);
   const minuteWheelRef = useRef<HTMLDivElement>(null);
   const periodWheelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isTimePickerOpen) return;
+    if (!isTimePickerOpen && !isDatePickerOpen) return;
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!timePickerRef.current?.contains(event.target as Node)) {
+      if (!timePickerRef.current?.contains(event.target as Node) && !datePickerRef.current?.contains(event.target as Node)) {
         setIsTimePickerOpen(false);
+        setIsDatePickerOpen(false);
       }
     };
 
@@ -105,7 +164,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
     };
-  }, [isTimePickerOpen]);
+  }, [isTimePickerOpen, isDatePickerOpen]);
 
   useEffect(() => {
     if (!isTimePickerOpen) return;
@@ -124,6 +183,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
     setSubmitError('');
     setSubmitMessage('');
+    setBookingOutcome('idle');
 
     if (formData.consultationDate < todayDate) {
       setSubmitError('Please choose a consultation date today or later.');
@@ -165,16 +225,34 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       });
 
       const responseText = await response.text();
-      const result = responseText ? JSON.parse(responseText) : {};
+      let result: Record<string, unknown> = {};
 
-      if (!response.ok || result.success === false) {
-        throw new Error(result.message || 'We could not book that consultation. Please try another slot.');
+      try {
+        result = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        result = {};
       }
 
-      setSubmitMessage(result.message || 'Consultation booked successfully');
+      const agentValue = (result.output as { data?: { value?: { response?: { successful?: boolean }; recipient?: string } } } | undefined)?.data?.value
+        ?? (result as { output?: { value?: { response?: { successful?: boolean }; recipient?: string } } }).output?.value
+        ?? (result as { value?: { response?: { successful?: boolean }; recipient?: string } }).value;
+      const isConfirmed = agentValue?.response?.successful === true;
+
+      if (!response.ok || !isConfirmed) {
+        setBookingOutcome('error');
+        setConfirmationRecipient(formData.email);
+        setStep(2);
+        return;
+      }
+
+      setSubmitMessage('Consultation booked successfully');
+      setBookingOutcome('success');
+      setConfirmationRecipient(agentValue?.recipient || formData.email);
       setStep(2);
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Something went wrong while booking your consultation.');
+    } catch {
+      setBookingOutcome('error');
+      setConfirmationRecipient(formData.email);
+      setStep(2);
     } finally {
       setIsSubmitting(false);
     }
@@ -194,7 +272,10 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     });
     setSubmitMessage('');
     setSubmitError('');
+    setBookingOutcome('idle');
+    setConfirmationRecipient('');
     setIsTimePickerOpen(false);
+    setIsDatePickerOpen(false);
     setDraftTime({
       hour: '09',
       minute: '00',
@@ -214,6 +295,17 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       period: 'AM',
     });
     setIsTimePickerOpen(true);
+    setIsDatePickerOpen(false);
+  };
+
+  const openDatePicker = () => {
+    const initialDate = formData.consultationDate
+      ? parseDateValue(formData.consultationDate)
+      : parseDateValue(todayDate);
+
+    setCalendarMonth(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+    setIsDatePickerOpen(true);
+    setIsTimePickerOpen(false);
   };
 
   const saveTimePicker = () => {
@@ -222,6 +314,20 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
       consultationTime: toTwentyFourHourTime(draftTime.hour, draftTime.minute, draftTime.period),
     });
     setIsTimePickerOpen(false);
+  };
+
+  const selectDate = (value: string) => {
+    if (value < todayDate) return;
+
+    setFormData({
+      ...formData,
+      consultationDate: value,
+    });
+    setIsDatePickerOpen(false);
+  };
+
+  const changeCalendarMonth = (direction: -1 | 1) => {
+    setCalendarMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + direction, 1));
   };
 
   const scrollWheelToValue = (element: HTMLDivElement | null, values: string[], value: string) => {
@@ -431,21 +537,87 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="consultation-date-input" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Consultation Date</label>
-                  <input
-                    id="consultation-date-input"
-                    type="date"
-                    required
-                    min={todayDate}
-                    value={formData.consultationDate}
-                    onChange={(e) => setFormData({ ...formData, consultationDate: e.target.value })}
-                    className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none transition-colors duration-300 ${
-                      isDark 
-                        ? 'border-slate-800 bg-slate-950 text-white placeholder-slate-650 focus:border-blue-500' 
-                        : 'border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-450 focus:border-blue-600'
-                    }`}
-                  />
+                <div ref={datePickerRef} className="space-y-1.5">
+                  <label htmlFor="consultation-date-trigger" className={`text-xs font-bold uppercase tracking-wider font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Consultation Date</label>
+                  <div className="relative">
+                    <button
+                      id="consultation-date-trigger"
+                      type="button"
+                      onClick={openDatePicker}
+                      aria-expanded={isDatePickerOpen}
+                      className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm font-medium focus:outline-none transition-colors duration-300 ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-950 text-white focus:border-blue-500'
+                          : 'border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-600'
+                      }`}
+                    >
+                      <span className={formData.consultationDate ? '' : isDark ? 'text-slate-650' : 'text-slate-450'}>
+                        {formatDisplayDate(formData.consultationDate)}
+                      </span>
+                      <Calendar className="h-4 w-4 text-blue-500" />
+                    </button>
+
+                    {isDatePickerOpen && (
+                      <div className={`absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border p-3 shadow-2xl sm:p-4 ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
+                          : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => changeCalendarMonth(-1)}
+                            className={`rounded-lg p-2 transition-colors ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}
+                            aria-label="Previous month"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <div className="text-sm font-semibold">
+                            {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => changeCalendarMonth(1)}
+                            className={`rounded-lg p-2 transition-colors ${isDark ? 'hover:bg-slate-900' : 'hover:bg-slate-100'}`}
+                            aria-label="Next month"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-mono font-semibold uppercase tracking-widest text-slate-400">
+                          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) => (
+                            <span key={day}>{day}</span>
+                          ))}
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-7 gap-1">
+                          {getCalendarDays(calendarMonth).map((day) => {
+                            const isSelected = day.value === formData.consultationDate;
+                            const isDisabled = day.isDisabled || !day.isCurrentMonth;
+
+                            return (
+                              <button
+                                key={day.value}
+                                type="button"
+                                disabled={isDisabled}
+                                onClick={() => selectDate(day.value)}
+                                className={`h-9 rounded-lg text-sm font-medium transition-all ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white'
+                                    : isDark
+                                      ? 'text-slate-200 hover:bg-slate-900'
+                                      : 'text-slate-700 hover:bg-slate-100'
+                                } ${isDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                              >
+                                {parseDateValue(day.value).getDate()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -642,53 +814,96 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
             </form>
           ) : (
             <div id="booking-success-view" className="py-6 text-center space-y-6">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 border border-emerald-250">
-                <CheckCircle2 className="h-8 w-8 text-emerald-600 animate-pulse" />
-              </div>
+              {bookingOutcome === 'success' ? (
+                <>
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-400/30">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                  </div>
 
-              <div className="space-y-2">
-                <h3 className={`font-display text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Consultation Booked!
-                </h3>
-                <p className={`mx-auto max-w-sm text-xs sm:text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {submitMessage || 'Consultation booked successfully'}. Thank you, <span className="font-semibold text-blue-600">{formData.name}</span>. We have scheduled a demonstration tailored to <span className="font-semibold text-blue-600">{formData.company}</span>&apos;s email operations.
-                </p>
-              </div>
+                  <div className="space-y-3">
+                    <h3 className={`font-display text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      Consultation Booked!
+                    </h3>
+                    <p className={`mx-auto max-w-sm text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Thanks, {formData.name}. Your consultation has been requested.
+                    </p>
+                  </div>
 
-              <div className={`rounded-xl border p-4 text-left space-y-2.5 transition-colors duration-300 ${
-                isDark ? 'border-slate-850 bg-slate-950' : 'border-slate-200 bg-slate-50'
-              }`}>
-                <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>Next Steps</span>
-                </div>
-                <ul className={`space-y-2 text-xs font-sans ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-blue-600">1.</span>
-                    <span>Check your inbox (<span className="font-medium text-blue-600">{formData.email}</span>) for a calendar placeholder.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-blue-600">2.</span>
-                    <span>An integration specialist will prepare a mock <strong>{formData.workflow} Agent</strong> based on your specs.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-bold text-blue-600">3.</span>
-                    <span>We&apos;ll build and launch your custom inbox in a secure sandbox together.</span>
-                  </li>
-                </ul>
-              </div>
+                  <div className={`rounded-2xl border p-5 text-left space-y-4 transition-colors duration-300 ${
+                    isDark ? 'border-slate-800 bg-slate-950/80' : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <div className="space-y-1">
+                      <p className={`text-xs font-bold uppercase tracking-widest font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Booking Details</p>
+                      <p className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{formatFullDateDisplay(formData.consultationDate)}</p>
+                      <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{formatDisplayTime(formData.consultationTime)}</p>
+                    </div>
 
-              <button
-                id="success-close-btn"
-                onClick={handleClose}
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
-                  isDark 
-                    ? 'border-slate-800 bg-slate-900 text-slate-200 hover:text-white hover:bg-slate-850' 
-                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-150'
-                }`}
-              >
-                Return to Product Page
-              </button>
+                    <div className="space-y-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3">
+                      <p className={`text-xs font-bold uppercase tracking-widest font-mono ${isDark ? 'text-blue-300' : 'text-blue-600'}`}>Confirmation</p>
+                      <p className={`text-sm leading-normal ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        We&apos;ll send the confirmation to:
+                      </p>
+                      <a
+                        href={`mailto:${confirmationRecipient || formData.email}`}
+                        className="text-sm font-semibold text-blue-500 hover:text-blue-400"
+                      >
+                        {confirmationRecipient || formData.email}
+                      </a>
+                    </div>
+                  </div>
+
+                  <button
+                    id="success-close-btn"
+                    onClick={handleClose}
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                      isDark
+                        ? 'border-slate-800 bg-slate-900 text-slate-200 hover:text-white hover:bg-slate-850'
+                        : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-150'
+                    }`}
+                  >
+                    Return to Product Page
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 border border-red-400/30">
+                    <X className="h-8 w-8 text-red-400" />
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className={`font-display text-2xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      Something went wrong
+                    </h3>
+                    <p className={`mx-auto max-w-sm text-sm leading-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                      We couldn&apos;t send your consultation confirmation. Please try again.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      id="retry-booking-btn"
+                      onClick={() => {
+                        setBookingOutcome('idle');
+                        setStep(1);
+                      }}
+                      className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-blue-700 cursor-pointer"
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      id="error-close-btn"
+                      onClick={handleClose}
+                      className={`flex-1 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all cursor-pointer ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-900 text-slate-200 hover:text-white hover:bg-slate-850'
+                          : 'border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-150'
+                      }`}
+                    >
+                      Return to Product Page
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </motion.div>
