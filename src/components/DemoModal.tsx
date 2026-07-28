@@ -8,10 +8,95 @@ interface DemoModalProps {
   onClose: () => void;
 }
 
-const timePickerHours = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-const timePickerMinutes = ['00', '15', '30', '45'];
 const timePickerPeriods = ['AM', 'PM'];
 const timePickerItemHeight = 44;
+const allowedTimeMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));
+const timePickerMinutes = allowedTimeMinutes;
+
+const isWithinBookingWindow = (hour24: number, minute: string) => {
+  if (!allowedTimeMinutes.includes(minute)) {
+    return false;
+  }
+
+  if (hour24 < 9 || hour24 > 22) {
+    return false;
+  }
+
+  if (hour24 === 22 && minute !== '00') {
+    return false;
+  }
+
+  return true;
+};
+
+const getAllowedHourOptions = (period: 'AM' | 'PM') => {
+  const baseHours = period === 'AM'
+    ? ['09', '10', '11', '12']
+    : ['12', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10'];
+
+  return baseHours;
+};
+
+const getAllowedMinuteOptions = (hour: string, period: 'AM' | 'PM') => {
+  const hourNumber = Number(hour);
+  const normalizedHour = period === 'PM'
+    ? hourNumber === 12 ? 12 : hourNumber + 12
+    : hourNumber === 12 ? 0 : hourNumber;
+
+  if (normalizedHour === 22) {
+    return ['00'];
+  }
+
+  return allowedTimeMinutes;
+};
+
+const normalizePickerTime = (value: string) => {
+  const trimmedValue = value.trim();
+
+  const twentyFourHourMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFourHourMatch) {
+    const hour = Number(twentyFourHourMatch[1]);
+    const minute = twentyFourHourMatch[2];
+
+    if (hour < 0 || hour > 23 || !isWithinBookingWindow(hour, minute)) {
+      return null;
+    }
+
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return {
+      hour: String(displayHour).padStart(2, '0'),
+      minute,
+      period,
+    };
+  }
+
+  const twelveHourMatch = trimmedValue.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (twelveHourMatch) {
+    const hour = Number(twelveHourMatch[1]);
+    const minute = twelveHourMatch[2];
+    const period = twelveHourMatch[3].toUpperCase() as 'AM' | 'PM';
+
+    if (hour < 1 || hour > 12 || !allowedTimeMinutes.includes(minute)) {
+      return null;
+    }
+
+    const normalizedHour = period === 'PM' ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+    const displayHour = normalizedHour % 12 || 12;
+
+    if (!isWithinBookingWindow(normalizedHour, minute)) {
+      return null;
+    }
+
+    return {
+      hour: String(displayHour).padStart(2, '0'),
+      minute,
+      period: normalizedHour >= 12 ? 'PM' : 'AM',
+    };
+  }
+
+  return null;
+};
 
 const getTodayDateString = () => {
   const today = new Date();
@@ -38,13 +123,13 @@ const parseTwentyFourHourTime = (value: string) => {
 
   return {
     hour: String(displayHour).padStart(2, '0'),
-    minute: timePickerMinutes.includes(minute) ? minute : '00',
+    minute: allowedTimeMinutes.includes(minute) ? minute : '00',
     period,
   };
 };
 
 const formatDisplayTime = (value: string) => {
-  if (!value) return 'Select a start time';
+  if (!value) return 'Select Time';
 
   const { hour, minute, period } = parseTwentyFourHourTime(value);
   return `${hour}:${minute} ${period}`;
@@ -104,12 +189,17 @@ const getCalendarDays = (month: Date) => {
 };
 
 const isValidPickerTime = (value: string) => {
-  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const normalizedTime = normalizePickerTime(value);
+  if (!normalizedTime) return false;
 
-  const [hour, minute] = value.split(':');
-  const hourNumber = Number(hour);
+  const hour = Number(normalizedTime.hour);
+  const minute = normalizedTime.minute;
+  const period = normalizedTime.period;
+  const normalizedHour = period === 'PM'
+    ? hour === 12 ? 12 : hour + 12
+    : hour === 12 ? 0 : hour;
 
-  return hourNumber >= 0 && hourNumber <= 23 && timePickerMinutes.includes(minute);
+  return isWithinBookingWindow(normalizedHour, minute);
 };
 
 const extractErrorMessage = (body: string, fallback: string) => {
@@ -188,8 +278,8 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     if (!isTimePickerOpen) return;
 
     requestAnimationFrame(() => {
-      scrollWheelToValue(hourWheelRef.current, timePickerHours, draftTime.hour);
-      scrollWheelToValue(minuteWheelRef.current, timePickerMinutes, draftTime.minute);
+      scrollWheelToValue(hourWheelRef.current, getAllowedHourOptions(draftTime.period as 'AM' | 'PM'), draftTime.hour);
+      scrollWheelToValue(minuteWheelRef.current, getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM'), draftTime.minute);
       scrollWheelToValue(periodWheelRef.current, timePickerPeriods, draftTime.period);
     });
   }, [draftTime.hour, draftTime.minute, draftTime.period, isTimePickerOpen]);
@@ -316,9 +406,38 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   };
 
   const saveTimePicker = () => {
+    const period = draftTime.period as 'AM' | 'PM';
+    const nextHourOptions = getAllowedHourOptions(period);
+    const validHour = nextHourOptions.includes(draftTime.hour) ? draftTime.hour : nextHourOptions[0];
+    const validMinuteOptions = getAllowedMinuteOptions(validHour, period);
+    const validMinute = validMinuteOptions.includes(draftTime.minute) ? draftTime.minute : validMinuteOptions[0];
+    const selectedTime = toTwentyFourHourTime(validHour, validMinute, period);
+
+    if (!isValidPickerTime(selectedTime)) {
+      const fallbackHour = period === 'AM' ? '09' : '12';
+      const fallbackTime = toTwentyFourHourTime(fallbackHour, '00', period);
+
+      setFormData({
+        ...formData,
+        consultationTime: fallbackTime,
+      });
+      setDraftTime({
+        ...draftTime,
+        hour: fallbackHour,
+        minute: '00',
+      });
+      setIsTimePickerOpen(false);
+      return;
+    }
+
     setFormData({
       ...formData,
-      consultationTime: toTwentyFourHourTime(draftTime.hour, draftTime.minute, draftTime.period),
+      consultationTime: selectedTime,
+    });
+    setDraftTime({
+      ...draftTime,
+      hour: validHour,
+      minute: validMinute,
     });
     setIsTimePickerOpen(false);
   };
@@ -362,10 +481,46 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     const selectedValue = values[selectedIndex];
 
     if (draftTime[field] !== selectedValue) {
-      setDraftTime((currentDraft) => ({
-        ...currentDraft,
-        [field]: selectedValue,
-      }));
+      setDraftTime((currentDraft) => {
+        if (field === 'period') {
+          const nextPeriod = selectedValue as 'AM' | 'PM';
+          const nextHourOptions = getAllowedHourOptions(nextPeriod);
+          const nextHour = nextHourOptions.includes(currentDraft.hour) ? currentDraft.hour : nextHourOptions[0];
+          const nextMinuteOptions = getAllowedMinuteOptions(nextHour, nextPeriod);
+          const nextMinute = nextMinuteOptions.includes(currentDraft.minute) ? currentDraft.minute : nextMinuteOptions[0];
+
+          return {
+            ...currentDraft,
+            period: nextPeriod,
+            hour: nextHour,
+            minute: nextMinute,
+          };
+        }
+
+        if (field === 'hour') {
+          const nextHour = selectedValue;
+          const nextMinuteOptions = getAllowedMinuteOptions(nextHour, currentDraft.period as 'AM' | 'PM');
+          const nextMinute = nextMinuteOptions.includes(currentDraft.minute) ? currentDraft.minute : nextMinuteOptions[0];
+
+          return {
+            ...currentDraft,
+            hour: nextHour,
+            minute: nextMinute,
+          };
+        }
+
+        if (field === 'minute') {
+          const nextMinuteOptions = getAllowedMinuteOptions(currentDraft.hour, currentDraft.period as 'AM' | 'PM');
+          const nextMinute = nextMinuteOptions.includes(selectedValue) ? selectedValue : nextMinuteOptions[0];
+
+          return {
+            ...currentDraft,
+            minute: nextMinute,
+          };
+        }
+
+        return currentDraft;
+      });
     }
   };
 
@@ -375,22 +530,55 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
     field: 'hour' | 'minute' | 'period',
     value: string,
   ) => {
-    setDraftTime((currentDraft) => ({
-      ...currentDraft,
-      [field]: value,
-    }));
+    setDraftTime((currentDraft) => {
+      if (field === 'hour') {
+        const nextHour = value;
+        const nextMinuteOptions = getAllowedMinuteOptions(nextHour, currentDraft.period as 'AM' | 'PM');
+        const nextMinute = nextMinuteOptions.includes(currentDraft.minute) ? currentDraft.minute : nextMinuteOptions[0];
+
+        return {
+          ...currentDraft,
+          hour: nextHour,
+          minute: nextMinute,
+        };
+      }
+
+      if (field === 'period') {
+        const nextPeriod = value as 'AM' | 'PM';
+        const nextHourOptions = getAllowedHourOptions(nextPeriod);
+        const nextHour = nextHourOptions.includes(currentDraft.hour) ? currentDraft.hour : nextHourOptions[0];
+        const nextMinuteOptions = getAllowedMinuteOptions(nextHour, nextPeriod);
+        const nextMinute = nextMinuteOptions.includes(currentDraft.minute) ? currentDraft.minute : nextMinuteOptions[0];
+
+        return {
+          ...currentDraft,
+          period: nextPeriod,
+          hour: nextHour,
+          minute: nextMinute,
+        };
+      }
+
+      return {
+        ...currentDraft,
+        [field]: value,
+      };
+    });
     scrollWheelToValue(element, values, value);
   };
 
   const getWheelOptionClassName = (isSelected: boolean, distance: number) => {
-    const fadeClass = distance === 1
-      ? isDark ? 'text-slate-400' : 'text-slate-500'
-      : isDark ? 'text-slate-600' : 'text-slate-350';
+    const opacityClass = distance === 0
+      ? 'opacity-100'
+      : distance === 1
+        ? 'opacity-70'
+        : distance === 2
+          ? 'opacity-45'
+          : 'opacity-25';
 
-    return `flex h-11 w-full shrink-0 snap-center items-center justify-center rounded-lg text-sm font-bold transition-all ${
+    return `flex h-11 w-full shrink-0 snap-center items-center justify-center rounded-xl border text-sm font-semibold transition-all ${
       isSelected
-        ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/40'
-        : `${fadeClass} hover:text-blue-500`
+        ? 'border-blue-400/50 bg-blue-600 text-white shadow-sm'
+        : `${isDark ? 'border-transparent text-slate-400' : 'border-transparent text-slate-500'} ${opacityClass} hover:text-blue-500`
     }`;
   };
 
@@ -415,7 +603,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className={`relative w-full max-w-lg max-h-[calc(100vh-40px)] overflow-y-auto rounded-2xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 z-10 ${
+          className={`relative w-full max-w-xl max-h-[calc(100vh-40px)] overflow-y-auto rounded-2xl border p-8 sm:p-10 shadow-2xl transition-colors duration-300 z-10 ${
             isDark 
               ? 'bg-slate-900 border-slate-800 text-white shadow-black/80 ring-1 ring-blue-500/10' 
               : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
@@ -647,37 +835,41 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </button>
 
                     {isTimePickerOpen && (
-                      <div className={`absolute right-0 bottom-full z-30 mb-2 w-[min(360px,calc(100vw-48px))] rounded-2xl border p-3 shadow-2xl sm:p-4 ${
+                      <div className={`absolute right-0 bottom-full z-30 mb-2 w-[min(360px,calc(100vw-48px))] rounded-3xl border p-4 shadow-2xl sm:p-5 ${
                         isDark
                           ? 'border-slate-800 bg-slate-950 text-white shadow-black/80 ring-1 ring-blue-500/10'
                           : 'border-slate-200 bg-white text-slate-800 shadow-slate-300/50'
                       }`}>
+                        <div className={`mb-3 text-center text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                          Select time
+                        </div>
+
                         <div className="grid grid-cols-3 gap-2 px-1 pb-2 text-center text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500">
-                          <span>Hours</span>
-                          <span>Minutes</span>
+                          <span>Hour</span>
+                          <span>Minute</span>
                           <span>AM/PM</span>
                         </div>
 
                         <div className="relative">
-                          <div className={`pointer-events-none absolute left-0 right-0 top-1/2 z-0 h-11 -translate-y-1/2 rounded-xl border ${
+                          <div className={`pointer-events-none absolute left-0 right-0 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl border ${
                             isDark ? 'border-blue-500/25 bg-blue-500/10' : 'border-blue-200 bg-blue-50'
                           }`} />
 
                           <div className="relative z-10 grid grid-cols-3 gap-2">
                             <div
                               ref={hourWheelRef}
-                              onScroll={() => handleWheelScroll(hourWheelRef.current, timePickerHours, 'hour')}
+                              onScroll={() => handleWheelScroll(hourWheelRef.current, getAllowedHourOptions(draftTime.period as 'AM' | 'PM'), 'hour')}
                               className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
                                 isDark ? 'bg-slate-900/80' : 'bg-slate-50'
                               }`}
                             >
-                              {timePickerHours.map((hour, index) => {
-                                const selectedIndex = timePickerHours.indexOf(draftTime.hour);
+                              {getAllowedHourOptions(draftTime.period as 'AM' | 'PM').map((hour, index) => {
+                                const selectedIndex = getAllowedHourOptions(draftTime.period as 'AM' | 'PM').indexOf(draftTime.hour);
                                 return (
                                   <button
                                     key={hour}
                                     type="button"
-                                    onClick={() => selectWheelValue(hourWheelRef.current, timePickerHours, 'hour', hour)}
+                                    onClick={() => selectWheelValue(hourWheelRef.current, getAllowedHourOptions(draftTime.period as 'AM' | 'PM'), 'hour', hour)}
                                     className={getWheelOptionClassName(draftTime.hour === hour, Math.abs(index - selectedIndex))}
                                   >
                                     {hour}
@@ -688,18 +880,18 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
                             <div
                               ref={minuteWheelRef}
-                              onScroll={() => handleWheelScroll(minuteWheelRef.current, timePickerMinutes, 'minute')}
+                              onScroll={() => handleWheelScroll(minuteWheelRef.current, getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM'), 'minute')}
                               className={`time-wheel-scroll h-[176px] snap-y snap-mandatory overflow-y-auto overscroll-contain rounded-xl px-1 py-[66px] ${
                                 isDark ? 'bg-slate-900/80' : 'bg-slate-50'
                               }`}
                             >
-                              {timePickerMinutes.map((minute, index) => {
-                                const selectedIndex = timePickerMinutes.indexOf(draftTime.minute);
+                              {getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM').map((minute, index) => {
+                                const selectedIndex = getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM').indexOf(draftTime.minute);
                                 return (
                                   <button
                                     key={minute}
                                     type="button"
-                                    onClick={() => selectWheelValue(minuteWheelRef.current, timePickerMinutes, 'minute', minute)}
+                                    onClick={() => selectWheelValue(minuteWheelRef.current, getAllowedMinuteOptions(draftTime.hour, draftTime.period as 'AM' | 'PM'), 'minute', minute)}
                                     className={getWheelOptionClassName(draftTime.minute === minute, Math.abs(index - selectedIndex))}
                                   >
                                     {minute}
@@ -739,7 +931,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                           }`} />
                         </div>
 
-                        <div className={`mt-4 flex items-center justify-between border-t pt-3 ${
+                        <div className={`mt-4 flex items-center justify-end gap-2 border-t pt-3 ${
                           isDark ? 'border-slate-800' : 'border-slate-200'
                         }`}>
                           <button
@@ -807,7 +999,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </>
                   ) : (
                     <>
-                      <span>Book Implementation Consultation</span>
+                      <span>Schedule Consultation</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
