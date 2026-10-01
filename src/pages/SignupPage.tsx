@@ -1,10 +1,11 @@
+import { Moon, SunMedium } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
 export default function SignupPage() {
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';
   const { user, loading, signup } = useAuth();
   const navigate = useNavigate();
@@ -56,7 +57,15 @@ export default function SignupPage() {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center px-4 py-12 transition-colors duration-300 ${isDark ? 'bg-slate-950 text-white' : 'bg-[#f5f7fb] text-slate-800'}`}>
+    <div className={`relative min-h-screen flex items-center justify-center px-4 py-12 transition-colors duration-300 ${isDark ? 'bg-slate-950 text-white' : 'bg-[#f5f7fb] text-slate-800'}`}>
+      <button
+        type="button"
+        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        onClick={toggleTheme}
+        className={`absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+      >
+        {isDark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
       <div className={`w-full max-w-md rounded-2xl border p-7 shadow-xl ${isDark ? 'border-slate-800 bg-slate-900/80' : 'border-slate-200 bg-white shadow-slate-200/60'}`}>
         <div className="mb-6 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">

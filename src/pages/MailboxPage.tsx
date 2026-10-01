@@ -10,7 +10,7 @@ import { getMailboxes, getThread, getThreads, type Mailbox, type MessageItem, ty
 export default function MailboxPage() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-  const { theme } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const params = useParams();
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
@@ -194,7 +194,7 @@ export default function MailboxPage() {
       : 'All conversations';
 
   return (
-    <div className={isDark ? 'h-screen bg-[#111827] text-slate-100' : 'h-screen bg-[#f5f5f4] text-slate-900'}>
+    <div className={isDark ? 'flex h-[100dvh] overflow-hidden bg-[#111827] text-slate-100' : 'flex h-[100dvh] overflow-hidden bg-[#f5f5f4] text-slate-900'}>
       {mailboxError ? (
         <div className={isDark ? 'flex min-h-screen items-center justify-center bg-[#111827] p-6' : 'flex min-h-screen items-center justify-center bg-[#f5f5f4] p-6'}>
           <div className={isDark ? 'max-w-md rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-center text-red-200' : 'max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700'}>
@@ -206,50 +206,57 @@ export default function MailboxPage() {
           </div>
         </div>
       ) : (
-        <div className="grid h-screen grid-cols-[280px_440px_minmax(0,1fr)] overflow-hidden border-t border-slate-200/80">
-          <Sidebar
-            mailboxes={mailboxes}
-            selectedMailbox={mailboxQuery}
-            unreadTotal={unreadTotal}
-            user={user}
-            onSelectMailbox={handleSelectMailbox}
-            onSelectFolder={setFolder}
-            selectedFolder={folder}
-            allInboxCounts={allInboxCounts}
-            onLogout={handleLogout}
-            isDark={isDark}
-          />
+        <div className="flex h-full min-h-0 w-full overflow-hidden border-t border-slate-200/80">
+          <div className="flex h-full min-h-0 w-[220px] shrink-0 lg:w-[280px]">
+            <Sidebar
+              mailboxes={mailboxes}
+              selectedMailbox={mailboxQuery}
+              unreadTotal={unreadTotal}
+              user={user}
+              onSelectMailbox={handleSelectMailbox}
+              onSelectFolder={setFolder}
+              selectedFolder={folder}
+              allInboxCounts={allInboxCounts}
+              onToggleTheme={toggleTheme}
+              onLogout={handleLogout}
+              isDark={isDark}
+            />
+          </div>
 
-          <ThreadList
-            threads={threads}
-            selectedThreadId={selectedThreadId}
-            selectedMailboxLabel={`${selectedMailboxName} · ${mailboxFolderLabel}`}
-            totalThreads={threads.length}
-            searchTerm={searchTerm}
-            filter={filter}
-            agentFilter={agentFilter}
-            agentOptions={agentOptions}
-            onSearchChange={setSearchTerm}
-            onFilterChange={setFilter}
-            onAgentFilterChange={setAgentFilter}
-            onSelectThread={handleSelectThread}
-            onRetry={() => setListRetryKey((value) => value + 1)}
-            loading={listLoading}
-            isDark={isDark}
-          />
+          <div className="flex h-full min-h-0 w-[300px] shrink-0 lg:w-[440px]">
+            <ThreadList
+              threads={threads}
+              selectedThreadId={selectedThreadId}
+              selectedMailboxLabel={`${selectedMailboxName} · ${mailboxFolderLabel}`}
+              totalThreads={threads.length}
+              searchTerm={searchTerm}
+              filter={filter}
+              agentFilter={agentFilter}
+              agentOptions={agentOptions}
+              onSearchChange={setSearchTerm}
+              onFilterChange={setFilter}
+              onAgentFilterChange={setAgentFilter}
+              onSelectThread={handleSelectThread}
+              onRetry={() => setListRetryKey((value) => value + 1)}
+              loading={listLoading}
+              isDark={isDark}
+            />
+          </div>
 
-          <ThreadView
-            thread={selectedThread}
-            messages={selectedThreadMessages}
-            loading={threadLoading}
-            error={threadError}
-            onRetry={() => selectedThreadId && getThread(selectedThreadId).then((data) => {
-              setSelectedThread(data.thread);
-              setSelectedThreadMessages(data.messages);
-              setThreadError('');
-            }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load thread'))}
-            isDark={isDark}
-          />
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <ThreadView
+              thread={selectedThread}
+              messages={selectedThreadMessages}
+              loading={threadLoading}
+              error={threadError}
+              onRetry={() => selectedThreadId && getThread(selectedThreadId).then((data) => {
+                setSelectedThread(data.thread);
+                setSelectedThreadMessages(data.messages);
+                setThreadError('');
+              }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load thread'))}
+              isDark={isDark}
+            />
+          </div>
         </div>
       )}
     </div>

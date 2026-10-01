@@ -1,4 +1,4 @@
-import { Inbox, Mail, Settings, Sparkles } from 'lucide-react';
+import { Inbox, Mail, Moon, Settings, Sparkles, SunMedium } from 'lucide-react';
 import type { User } from '../../context/AuthContext';
 import type { Mailbox as MailboxType } from '../../services/mailboxApi';
 
@@ -11,6 +11,7 @@ export function Sidebar({
   onSelectFolder,
   selectedFolder,
   allInboxCounts,
+  onToggleTheme,
   onLogout,
   isDark,
 }: {
@@ -22,6 +23,7 @@ export function Sidebar({
   onSelectFolder: (folder: 'all' | 'incoming' | 'sent') => void;
   selectedFolder: 'all' | 'incoming' | 'sent';
   allInboxCounts: { incoming_count: number; sent_count: number; total_count: number };
+  onToggleTheme: () => void;
   onLogout: () => void;
   isDark: boolean;
 }) {
@@ -147,14 +149,24 @@ export function Sidebar({
             <div className={`truncate text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name || 'Hello Agent user'}</div>
             <div className={`truncate text-xs ${subtleText}`}>{user?.email || ''}</div>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-          >
-            <Settings className="h-3.5 w-3.5" />
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={onToggleTheme}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              {isDark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     </aside>

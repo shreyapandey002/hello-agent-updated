@@ -80,9 +80,26 @@ export function ThreadList({
   const badgeNeutral = isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700';
   const badgeDanger = isDark ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700';
 
+  const getThreadListChips = (thread: ThreadItem) => {
+    const isInbound = thread.last_direction !== 'outbound';
+    const websiteFormLike = thread.subject.toLowerCase().includes('consultation request') || thread.preview.toLowerCase().includes('preferred slot');
+
+    if (isInbound) {
+      return [
+        { label: 'Source', value: websiteFormLike ? 'Website form' : 'Email' },
+        { label: 'Status', value: 'Received' },
+      ];
+    }
+
+    return [
+      { label: 'Handled by', value: thread.last_agent || 'General/Scheduling Agent' },
+      { label: 'Status', value: thread.last_status === 'failed' ? 'Failed' : 'Sent' },
+    ];
+  };
+
   return (
-    <div className={`flex h-full flex-col border-r ${shell}`}>
-      <div className={`border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+    <div className={`flex h-full min-h-0 flex-col border-r ${shell}`}>
+      <div className={`shrink-0 border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className={`text-[11px] font-medium uppercase tracking-[0.2em] ${muted}`}>Inbox</div>
@@ -147,7 +164,7 @@ export function ThreadList({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
           <div className="space-y-2 p-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -158,17 +175,12 @@ export function ThreadList({
           <div className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
             {visibleThreads.map((thread) => {
               const isSelected = thread.id === selectedThreadId;
-              const badgeText = thread.last_status === 'failed'
-                ? 'Failed'
-                : thread.last_direction === 'outbound' && thread.last_status === 'sent'
-                  ? 'Agent replied'
-                  : 'Awaiting agent';
+              const chips = getThreadListChips(thread);
               const badgeTone = thread.last_status === 'failed'
                 ? badgeDanger
-                : thread.last_direction === 'outbound' && thread.last_status === 'sent'
+                : thread.last_direction === 'outbound' && thread.last_status !== 'failed'
                   ? badgeSuccess
                   : badgeNeutral;
-              const actionLabel = thread.last_agent || 'general_info';
 
               return (
                 <button
@@ -198,16 +210,12 @@ export function ThreadList({
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {thread.unread ? <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> : null}
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
-                          <Sparkles className="h-2.5 w-2.5" />
-                          {badgeText}
-                        </span>
-                        {actionLabel ? (
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${actionChip}`}>
-                            <Tag className="h-2.5 w-2.5" />
-                            {actionLabel}
+                        {chips.map((chipItem) => (
+                          <span key={`${thread.id}-${chipItem.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
+                            <span className="opacity-70">{chipItem.label}:</span>
+                            <span>{chipItem.value}</span>
                           </span>
-                        ) : null}
+                        ))}
                         <span className={`text-[10px] ${muted}`}>{thread.mailbox}</span>
                       </div>
                     </div>
