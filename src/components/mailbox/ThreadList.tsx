@@ -1,0 +1,241 @@
+import { ChevronDown, Search, Sparkles, Tag, X } from 'lucide-react';
+import type { ThreadItem } from '../../services/mailboxApi';
+
+function formatRelativeTime(value: string | null) {
+  if (!value) return 'just now';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'just now';
+
+  const now = new Date();
+  const diffMinutes = Math.max(1, Math.round((now.getTime() - date.getTime()) / 60000));
+  if (diffMinutes < 60) return `${diffMinutes}m`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getContactInitial(thread: ThreadItem) {
+  const source = thread.contact_name || thread.contact_email || 'A';
+  return source.charAt(0).toUpperCase();
+}
+
+export function ThreadList({
+  threads,
+  selectedThreadId,
+  selectedMailboxLabel,
+  totalThreads,
+  searchTerm,
+  filter,
+  agentFilter,
+  agentOptions,
+  onSearchChange,
+  onFilterChange,
+  onAgentFilterChange,
+  onSelectThread,
+  onRetry,
+  loading,
+  isDark,
+}: {
+  threads: ThreadItem[];
+  selectedThreadId: number | null;
+  selectedMailboxLabel: string;
+  totalThreads: number;
+  searchTerm: string;
+  filter: 'all' | 'unread' | 'replied';
+  agentFilter: string;
+  agentOptions: string[];
+  onSearchChange: (value: string) => void;
+  onFilterChange: (value: 'all' | 'unread' | 'replied') => void;
+  onAgentFilterChange: (value: string) => void;
+  onSelectThread: (id: number) => void;
+  onRetry: () => void;
+  loading: boolean;
+  isDark: boolean;
+}) {
+  const unreadTotal = threads.filter((thread) => thread.unread).length;
+  const repliedTotal = threads.filter((thread) => thread.last_direction === 'outbound' && thread.last_status !== 'failed').length;
+
+  const visibleThreads = threads.filter((thread) => {
+    if (filter === 'unread' && !thread.unread) return false;
+    if (filter === 'replied' && !(thread.last_direction === 'outbound' && thread.last_status !== 'failed')) return false;
+    if (agentFilter !== 'all' && (thread.last_agent || '') !== agentFilter) return false;
+    return true;
+  });
+
+  const shell = isDark ? 'border-slate-800 bg-[#111827]' : 'border-slate-200 bg-[#f7f7f5]';
+  const panel = isDark ? 'border-slate-800 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-800';
+  const muted = isDark ? 'text-slate-400' : 'text-slate-500';
+  const strong = isDark ? 'text-slate-100' : 'text-slate-900';
+  const soft = isDark ? 'text-slate-300' : 'text-slate-600';
+  const rowSelected = isDark ? 'bg-slate-800/90' : 'bg-slate-100';
+  const rowHover = isDark ? 'hover:bg-slate-900/80' : 'hover:bg-slate-50';
+  const field = isDark ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-700 placeholder:text-slate-400';
+  const chip = isDark ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-slate-100 text-slate-700 border-slate-200';
+  const toggle = isDark ? 'text-slate-300' : 'text-slate-600';
+  const actionChip = isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700';
+  const badgeSuccess = isDark ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  const badgeNeutral = isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700';
+  const badgeDanger = isDark ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700';
+
+  return (
+    <div className={`flex h-full flex-col border-r ${shell}`}>
+      <div className={`border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className={`text-[11px] font-medium uppercase tracking-[0.2em] ${muted}`}>Inbox</div>
+            <div className={`text-[11px] font-medium ${muted}`}>•</div>
+            <div className={`text-[11px] font-medium ${strong}`}>{selectedMailboxLabel}</div>
+          </div>
+          <div className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${chip}`}>
+            {totalThreads} {totalThreads === 1 ? 'thread' : 'threads'}
+          </div>
+        </div>
+
+        <div className="relative mt-4">
+          <Search className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${muted}`} />
+          <input
+            value={searchTerm}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Search conversations"
+            className={`w-full rounded-xl border py-2.5 pl-9 pr-10 text-sm outline-none focus:border-slate-400 ${field}`}
+          />
+          {!searchTerm ? (
+            <div className={`absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${chip}`}>
+              <span className="text-[10px] font-semibold">/</span>
+            </div>
+          ) : (
+            <button type="button" onClick={() => onSearchChange('')} className={`absolute right-3 top-1/2 -translate-y-1/2 ${muted}`}>
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'All', value: 'all' },
+              { label: `Unread ${unreadTotal}`, value: 'unread' },
+              { label: `Agent replied ${repliedTotal}`, value: 'replied' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onFilterChange(option.value as 'all' | 'unread' | 'replied')}
+                className={`rounded-full border px-2.5 py-1.5 text-xs font-medium transition ${filter === option.value ? (isDark ? 'border-slate-700 bg-slate-700 text-white' : 'border-slate-300 bg-slate-900 text-white') : (isDark ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-500')}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={`relative`}> 
+            <select
+              value={agentFilter}
+              onChange={(event) => onAgentFilterChange(event.target.value)}
+              className={`appearance-none rounded-full border px-3 py-1.5 pr-8 text-xs font-medium outline-none ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+            >
+              <option value="all">All agents</option>
+              {agentOptions.map((agent) => (
+                <option key={agent} value={agent}>{agent}</option>
+              ))}
+            </select>
+            <ChevronDown className={`pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 ${toggle}`} />
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="space-y-2 p-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className={`h-20 animate-pulse rounded-xl ${isDark ? 'bg-slate-800/80' : 'bg-slate-200'}`} />
+            ))}
+          </div>
+        ) : visibleThreads.length > 0 ? (
+          <div className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
+            {visibleThreads.map((thread) => {
+              const isSelected = thread.id === selectedThreadId;
+              const badgeText = thread.last_status === 'failed'
+                ? 'Failed'
+                : thread.last_direction === 'outbound' && thread.last_status === 'sent'
+                  ? 'Agent replied'
+                  : 'Awaiting agent';
+              const badgeTone = thread.last_status === 'failed'
+                ? badgeDanger
+                : thread.last_direction === 'outbound' && thread.last_status === 'sent'
+                  ? badgeSuccess
+                  : badgeNeutral;
+              const actionLabel = thread.last_agent || 'general_info';
+
+              return (
+                <button
+                  key={thread.id}
+                  type="button"
+                  onClick={() => onSelectThread(thread.id)}
+                  className={`block w-full border-l-2 px-3 py-3 text-left transition ${isSelected ? `border-slate-900 ${rowSelected}` : `border-transparent ${rowHover}`}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: thread.unread ? '#111827' : '#e5e7eb', color: thread.unread ? '#f8fafc' : '#374151' }}>
+                      {getContactInitial(thread)}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className={`truncate text-sm font-semibold ${thread.unread ? strong : soft}`}>
+                          {thread.contact_name || thread.contact_email || 'Unknown contact'}
+                        </div>
+                        <div className={`shrink-0 text-[10px] ${muted}`}>{formatRelativeTime(thread.last_message_at)}</div>
+                      </div>
+
+                      <div className={`mt-1 truncate text-[13px] ${thread.unread ? strong : soft}`}>
+                        {thread.subject || 'No subject'}
+                      </div>
+
+                      <div className={`mt-1 truncate text-xs ${muted}`}>{thread.preview || 'No preview available.'}</div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {thread.unread ? <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> : null}
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
+                          <Sparkles className="h-2.5 w-2.5" />
+                          {badgeText}
+                        </span>
+                        {actionLabel ? (
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${actionChip}`}>
+                            <Tag className="h-2.5 w-2.5" />
+                            {actionLabel}
+                          </span>
+                        ) : null}
+                        <span className={`text-[10px] ${muted}`}>{thread.mailbox}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center p-6 text-center">
+            <div>
+              <div className={`text-lg font-semibold ${strong}`}>No conversations yet</div>
+              <div className={`mt-2 text-sm ${muted}`}>Try a different inbox or search query.</div>
+              {searchTerm || filter !== 'all' || agentFilter !== 'all' ? (
+                <button type="button" onClick={() => { onSearchChange(''); onFilterChange('all'); onAgentFilterChange('all'); }} className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-700">
+                  Reset filters
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!loading && visibleThreads.length === 0 ? (
+        <div className={`border-t px-3 py-2 text-center text-xs ${muted}`}>
+          {searchTerm || filter !== 'all' || agentFilter !== 'all' ? 'No matches found' : 'No threads available'}
+        </div>
+      ) : null}
+    </div>
+  );
+}
