@@ -40,7 +40,7 @@ export function Sidebar({
   ] as const;
 
   return (
-    <aside className={`flex h-full flex-col border-r ${shell}`}>
+    <aside className={`flex h-full min-w-0 flex-col border-r ${shell}`}>
       <div className={`flex items-center gap-3 border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${isDark ? 'bg-slate-100 text-slate-900' : 'bg-[#111827] text-white'}`}>
           <Sparkles className="h-4 w-4" />
@@ -59,9 +59,9 @@ export function Sidebar({
           }}
           className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${selectedMailbox === 'all' ? selectedRow : `${rowBase} ${mutedText}`}`}
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <Inbox className="h-4 w-4" />
-            <span className="font-medium">All inboxes</span>
+            <span className="min-w-0 break-words font-medium">All inboxes</span>
           </span>
           {unreadTotal > 0 ? (
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${chip}`}>{unreadTotal}</span>
@@ -81,7 +81,7 @@ export function Sidebar({
                 }}
                 className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition ${isActive ? (isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900') : `${rowBase} ${mutedText}`}`}
               >
-                <span>{folder.label}</span>
+                <span className="min-w-0 break-words">{folder.label}</span>
                 <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${chip}`}>{folder.count}</span>
               </button>
             );
@@ -131,7 +131,7 @@ export function Sidebar({
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition ${isActive ? (isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900') : `${rowBase} ${mutedText}`}`}
                       >
-                        <span>{folder.label}</span>
+                        <span className="min-w-0 break-words">{folder.label}</span>
                         <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${chip}`}>{folder.count}</span>
                       </button>
                     );

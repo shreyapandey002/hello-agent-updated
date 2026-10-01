@@ -98,13 +98,13 @@ export function ThreadList({
   };
 
   return (
-    <div className={`flex h-full min-h-0 flex-col border-r ${shell}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col border-r ${shell}`}>
       <div className={`shrink-0 border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <div className={`text-[11px] font-medium uppercase tracking-[0.2em] ${muted}`}>Inbox</div>
             <div className={`text-[11px] font-medium ${muted}`}>•</div>
-            <div className={`text-[11px] font-medium ${strong}`}>{selectedMailboxLabel}</div>
+            <div className={`min-w-0 break-words text-[11px] font-medium ${strong}`}>{selectedMailboxLabel}</div>
           </div>
           <div className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${chip}`}>
             {totalThreads} {totalThreads === 1 ? 'thread' : 'threads'}

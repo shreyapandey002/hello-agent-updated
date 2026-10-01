@@ -117,6 +117,9 @@ export default function MailboxPage() {
         const data = await getThread(selectedThreadId);
         setSelectedThread(data.thread);
         setSelectedThreadMessages(data.messages);
+        void getMailboxes()
+          .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
+          .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
       } catch (error) {
         setThreadError(error instanceof Error ? error.message : 'Unable to load thread');
       } finally {
@@ -207,7 +210,7 @@ export default function MailboxPage() {
         </div>
       ) : (
         <div className="flex h-full min-h-0 w-full overflow-hidden border-t border-slate-200/80">
-          <div className="flex h-full min-h-0 w-[220px] shrink-0 lg:w-[280px]">
+          <div className={`flex h-full min-h-0 w-[clamp(110px,18vw,280px)] min-w-0 shrink-0 ${selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
             <Sidebar
               mailboxes={mailboxes}
               selectedMailbox={mailboxQuery}
@@ -223,7 +226,7 @@ export default function MailboxPage() {
             />
           </div>
 
-          <div className="flex h-full min-h-0 w-[300px] shrink-0 lg:w-[440px]">
+          <div className={`flex h-full min-h-0 w-[clamp(190px,30vw,440px)] min-w-0 shrink-0 ${selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
             <ThreadList
               threads={threads}
               selectedThreadId={selectedThreadId}
@@ -243,16 +246,20 @@ export default function MailboxPage() {
             />
           </div>
 
-          <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className={`flex min-h-0 min-w-0 flex-1 ${!selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
             <ThreadView
               thread={selectedThread}
               messages={selectedThreadMessages}
               loading={threadLoading}
               error={threadError}
+              onBack={() => navigate('/mailbox' + location.search)}
               onRetry={() => selectedThreadId && getThread(selectedThreadId).then((data) => {
                 setSelectedThread(data.thread);
                 setSelectedThreadMessages(data.messages);
                 setThreadError('');
+                void getMailboxes()
+                  .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
+                  .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
               }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load thread'))}
               isDark={isDark}
             />

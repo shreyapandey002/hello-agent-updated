@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronDown } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MessageItem, ThreadDetails } from '../../services/mailboxApi';
 
@@ -140,6 +140,7 @@ export function ThreadView({
   loading,
   error,
   onRetry,
+  onBack,
   isDark,
 }: {
   thread: ThreadDetails | null;
@@ -147,6 +148,7 @@ export function ThreadView({
   loading: boolean;
   error: string;
   onRetry: () => void;
+  onBack: () => void;
   isDark: boolean;
 }) {
   const shell = isDark ? 'bg-[#111827] text-slate-100' : 'bg-[#f7f7f5] text-slate-900';
@@ -223,16 +225,20 @@ export function ThreadView({
   }
 
   return (
-    <div className={`flex h-full min-h-0 flex-col ${shell}`}>
-      <div className={`shrink-0 border-b px-5 py-4 ${border}`}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className={`text-[18px] font-semibold ${strong}`}>{thread.subject || 'No subject'}</h2>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col ${shell}`}>
+      <div className={`min-w-0 shrink-0 border-b px-5 py-4 ${border}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className={`break-words [overflow-wrap:anywhere] text-[18px] font-semibold ${strong}`}>{thread.subject || 'No subject'}</h2>
             <div className={`mt-1 text-sm ${soft}`}>
-              {thread.mailbox} · {orderedMessages.length} messages
+              <span className="break-all">{thread.mailbox}</span> · {orderedMessages.length} messages
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onBack} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium min-[768px]:hidden ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Inbox
+            </button>
             <button type="button" onClick={expandAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
               Expand all
             </button>
@@ -243,7 +249,7 @@ export function ThreadView({
         </div>
       </div>
 
-      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto p-5">
+      <div ref={messagesContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5">
         <div className="space-y-4">
           {orderedMessages.map((message, index) => {
             const isInbound = message.direction === 'inbound';
@@ -268,7 +274,7 @@ export function ThreadView({
                 ) : null}
                 <div className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${isDark ? 'border-slate-900 bg-sky-500' : 'border-white bg-sky-600'}`} />
 
-                <div className={`rounded-2xl border ${card}`}>
+                <div className={`min-w-0 rounded-2xl border ${card}`}>
                   <button
                     type="button"
                     onClick={() => setExpandedIds((current) => {
@@ -283,14 +289,14 @@ export function ThreadView({
                     aria-expanded={isExpanded}
                     className="w-full text-left"
                   >
-                    <div className="flex items-start justify-between gap-3 px-4 py-3">
-                      <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start justify-between gap-3 px-4 py-3">
+                      <div className="flex min-w-0 items-start gap-3">
                         <div className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-semibold ${isInbound ? (isDark ? 'bg-[#d9f7ea] text-slate-800' : 'bg-emerald-100 text-emerald-900') : (isDark ? 'bg-slate-200 text-slate-900' : 'bg-slate-900 text-white')}`}>
                           {initials}
                         </div>
-                        <div>
-                          <div className={`text-sm font-semibold ${strong}`}>{senderName}</div>
-                          <div className={`text-[11px] ${soft}`}>{senderEmail}</div>
+                        <div className="min-w-0">
+                          <div className={`break-words [overflow-wrap:anywhere] text-sm font-semibold ${strong}`}>{senderName}</div>
+                          <div className={`break-all text-[11px] ${soft}`}>{senderEmail}</div>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             {chips.map((chip) => (
                               <span key={`${message.id}-${chip.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${chip.label === 'Status' ? badgeTone : (isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700')}`}>
@@ -302,7 +308,7 @@ export function ThreadView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
                         <span className={soft}>{formatMessageTime(message.created_at)}</span>
                         <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </div>
@@ -319,24 +325,24 @@ export function ThreadView({
                         <div className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] ${soft}`}>
                           Message details
                         </div>
-                        <div className={`grid gap-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                        <div className={`grid min-w-0 gap-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <span className={soft}>From:</span>
-                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>
+                            <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>
                               {isInbound ? `${thread.contact_name || 'Customer'} ${message.from_addr || senderEmail}` : `Hello Agent ${message.from_addr || senderEmail}`}
                             </span>
                           </div>
-                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                          <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <span className={soft}>To:</span>
-                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.to_addr || 'Unknown recipient'}</span>
+                            <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.to_addr || 'Unknown recipient'}</span>
                           </div>
-                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                          <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <span className={soft}>Subject:</span>
-                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.subject || thread.subject || 'No subject'}</span>
+                            <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.subject || thread.subject || 'No subject'}</span>
                           </div>
-                          <div className={`flex items-start justify-between gap-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                          <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
                             <span className={soft}>Date:</span>
-                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{formatDetailedMessageTime(message.created_at)}</span>
+                            <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{formatDetailedMessageTime(message.created_at)}</span>
                           </div>
                         </div>
                       </div>
@@ -348,15 +354,15 @@ export function ThreadView({
                           </div>
                           <div className="space-y-2 text-sm">
                             {getWebsiteFormRows(message, thread).map((row) => (
-                              <div key={`${message.id}-${row.label}`} className="flex gap-3">
-                                <div className={`w-[180px] shrink-0 text-xs font-medium ${soft}`}>{row.label}:</div>
-                                <div className={`min-w-0 flex-1 text-xs ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: row.preserveWrap ? 'pre-wrap' : 'normal' }}>{row.value}</div>
+                              <div key={`${message.id}-${row.label}`} className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-[minmax(7rem,0.4fr)_minmax(0,1fr)] sm:gap-3">
+                                <div className={`min-w-0 break-words text-xs font-medium ${soft}`}>{row.label}:</div>
+                                <div className={`min-w-0 break-words [overflow-wrap:anywhere] text-xs ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: row.preserveWrap ? 'pre-wrap' : 'normal' }}>{row.value}</div>
                               </div>
                             ))}
                           </div>
                         </div>
                       ) : (
-                        <div className={`leading-7 ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        <div className={`min-w-0 break-words [overflow-wrap:anywhere] leading-7 ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: 'pre-wrap' }}>
                           {bodyText}
                         </div>
                       )}
