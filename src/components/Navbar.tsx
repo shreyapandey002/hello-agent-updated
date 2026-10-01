@@ -1,6 +1,8 @@
 import { useState, useEffect, MouseEvent } from 'react';
 import { Menu, X, Mail, Sun, Moon } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
   onBookDemo: () => void;
@@ -10,6 +12,7 @@ export default function Navbar({ onBookDemo }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -112,6 +115,13 @@ export default function Navbar({ onBookDemo }: NavbarProps) {
               {isDark ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
             </button>
 
+            <Link
+              to={user ? '/mailbox' : '/login'}
+              className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-600 hover:text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900'}`}
+            >
+              {user ? 'Mailbox' : 'Login'}
+            </Link>
+
             <button
               onClick={onBookDemo}
               className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:scale-[1.01]"
@@ -165,7 +175,15 @@ export default function Navbar({ onBookDemo }: NavbarProps) {
               {item.label}
             </a>
           ))}
-          <div className="pt-4 px-4">
+          <div className="pt-4 px-4 space-y-3">
+            <Link
+              to={user ? '/mailbox' : '/login'}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block w-full rounded-xl border px-4 py-3 text-center text-base font-bold transition-colors ${isDark ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-600' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
+            >
+              {user ? 'Mailbox' : 'Login'}
+            </Link>
+
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

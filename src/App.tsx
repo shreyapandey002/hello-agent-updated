@@ -13,7 +13,7 @@ import SecurityComparisonArchitecture from './components/SecurityComparisonArchi
 import PricingFaqCTA from './components/PricingFaqCTA';
 import Footer from './components/Footer';
 import DemoModal from './components/DemoModal';
-import { ThemeProvider, useTheme } from './ThemeContext';
+import { useTheme } from './ThemeContext';
 
 function MainAppContent() {
   const [demoModalOpen, setDemoModalOpen] = useState(false);
@@ -103,9 +103,5 @@ function MainAppContent() {
 }
 
 export default function App() {
-  return (
-    <ThemeProvider>
-      <MainAppContent />
-    </ThemeProvider>
-  );
+  return <MainAppContent />;
 }

@@ -18,3 +18,32 @@
   from = "/health"
   to = "/.netlify/functions/health"
   status = 200
+
+[[redirects]]
+  from = "/api/auth/*"
+  to = "/.netlify/functions/auth-:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+[[redirects]]
+  from = "/login"
+  to = "/"
+  status = 200
+
+[[redirects]]
+  from = "/signup"
+  to = "/"
+  status = 200
+
+[[redirects]]
+  from = "/mailbox"
+  to = "/"
+  status = 200
+
+[[redirects]]
+  from = "/mailbox/*"
+  to = "/"
+  status = 200
