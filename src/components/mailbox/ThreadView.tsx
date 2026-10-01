@@ -1,4 +1,5 @@
-import { AlertTriangle, ChevronDown, Mail, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MessageItem, ThreadDetails } from '../../services/mailboxApi';
 
 function formatMessageTime(value: string) {
@@ -12,10 +13,28 @@ function formatMessageTime(value: string) {
   });
 }
 
+function formatDetailedMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return date.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function stripHtml(value: string | null | undefined) {
+  if (!value) return '';
+  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function parseMetadata(metadata: Record<string, any> | undefined) {
   if (!metadata || typeof metadata !== 'object') return null;
 
-  const keys = ['consultation_date', 'consultation_time', 'company_name', 'use_case', 'google_meet_link'];
+  const keys = ['consultation_date', 'consultation_time', 'company_name', 'use_case', 'google_meet_link', 'source'];
   const found = keys.filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '');
   if (!found.length) return null;
 
@@ -45,7 +64,27 @@ export function ThreadView({
   const soft = isDark ? 'text-slate-400' : 'text-slate-500';
   const strong = isDark ? 'text-slate-100' : 'text-slate-900';
   const card = isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white';
-  const cardMuted = isDark ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700';
+  const subtle = isDark ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700';
+
+  const orderedMessages = useMemo(
+    () => [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [messages]
+  );
+
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (!orderedMessages.length) {
+      setExpandedIds(new Set());
+      return;
+    }
+
+    const lastMessageId = orderedMessages[orderedMessages.length - 1]?.id;
+    setExpandedIds(new Set(lastMessageId ? [lastMessageId] : []));
+  }, [orderedMessages]);
+
+  const expandAll = () => setExpandedIds(new Set(orderedMessages.map((message) => message.id)));
+  const collapseAll = () => setExpandedIds(new Set());
 
   if (loading) {
     return (
@@ -91,86 +130,140 @@ export function ThreadView({
           <div>
             <h2 className={`text-[18px] font-semibold ${strong}`}>{thread.subject || 'No subject'}</h2>
             <div className={`mt-1 text-sm ${soft}`}>
-              {thread.mailbox} · {messages.length} messages
+              {thread.mailbox} · {orderedMessages.length} messages
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={expandAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+              Expand all
+            </button>
+            <button type="button" onClick={collapseAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+              Collapse all
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        {messages.map((message) => {
-          const metadata = parseMetadata(message.metadata);
-          const isInbound = message.direction === 'inbound';
-          const badgeStatus = message.status === 'failed' ? 'Failed' : message.status === 'sent' ? 'Sent' : 'Received';
-          const badgeColor = message.status === 'failed'
-            ? isDark ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700'
-            : isDark ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      <div className="relative flex-1 overflow-y-auto p-5">
+        <div className="space-y-4">
+          {orderedMessages.map((message, index) => {
+            const metadata = parseMetadata(message.metadata);
+            const isInbound = message.direction === 'inbound';
+            const isExpanded = expandedIds.has(message.id);
+            const senderName = isInbound ? (thread.contact_name || thread.contact_email || 'Customer') : 'Hello Agent';
+            const senderEmail = message.from_addr || (isInbound ? thread.contact_email : 'ai@helloagent.email') || 'unknown@example.com';
+            const isWebsiteForm = Boolean(message.metadata && (message.metadata.source === 'website_form' || String(message.metadata.source || '').toLowerCase().includes('website')));
+            const bodyText = message.body_text || stripHtml(message.body_html) || 'No message content.';
+            const previewText = stripHtml(bodyText).slice(0, 120) + (stripHtml(bodyText).length > 120 ? '…' : '');
+            const badgeStatus = message.status === 'failed' ? 'Failed' : message.status === 'sent' ? 'Sent' : 'Received';
+            const badgeColor = message.status === 'failed'
+              ? isDark ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-red-200 bg-red-50 text-red-700'
+              : isDark ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            const initials = (senderName || 'A').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
-          return (
-            <div key={message.id} className={`overflow-hidden rounded-xl border ${card}`}>
-              {isInbound ? (
-                <div className="border-b border-slate-200/20 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#d9f7ea] text-[11px] font-semibold text-slate-800">
-                        {(thread.contact_name || thread.contact_email || 'M').charAt(0).toUpperCase()}
+            return (
+              <div key={message.id} className="relative pl-7">
+                {index < orderedMessages.length - 1 ? (
+                  <div className={`absolute left-[15px] top-0 h-full w-px ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                ) : null}
+                <div className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${isDark ? 'border-slate-900 bg-sky-500' : 'border-white bg-sky-600'}`} />
+
+                <div className={`overflow-hidden rounded-2xl border ${card}`}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedIds((current) => {
+                      const next = new Set(current);
+                      if (next.has(message.id)) {
+                        next.delete(message.id);
+                      } else {
+                        next.add(message.id);
+                      }
+                      return next;
+                    })}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between gap-3 px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-semibold ${isInbound ? (isDark ? 'bg-[#d9f7ea] text-slate-800' : 'bg-emerald-100 text-emerald-900') : (isDark ? 'bg-slate-200 text-slate-900' : 'bg-slate-900 text-white')}`}>
+                          {initials}
+                        </div>
+                        <div>
+                          <div className={`text-sm font-semibold ${strong}`}>{senderName}</div>
+                          <div className={`text-[11px] ${soft}`}>{senderEmail}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {isWebsiteForm ? (
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${isDark ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300' : 'border-cyan-200 bg-cyan-50 text-cyan-700'}`}>
+                                Website form
+                              </span>
+                            ) : null}
+                            {!isInbound && message.agent_name ? (
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${isDark ? 'border-violet-500/40 bg-violet-500/10 text-violet-300' : 'border-violet-200 bg-violet-50 text-violet-700'}`}>
+                                {message.agent_name}
+                              </span>
+                            ) : null}
+                            {!isInbound ? (
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badgeColor}`}>{badgeStatus}</span>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className={`text-sm font-semibold ${strong}`}>{thread.contact_name || 'Customer'}</div>
-                        <div className={`text-[11px] ${soft}`}>{thread.contact_email || message.from_addr || 'Unknown sender'}</div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span className={soft}>{formatMessageTime(message.created_at)}</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </div>
                     </div>
-                    <div className={`text-[11px] ${soft}`}>{formatMessageTime(message.created_at)}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className={`flex items-center justify-between border-b px-4 py-3 ${isDark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-slate-100'}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`flex h-7 w-7 items-center justify-center rounded-md ${isDark ? 'bg-slate-100 text-slate-900' : 'bg-slate-900 text-white'}`}>
-                      <Sparkles className="h-3.5 w-3.5" />
-                    </div>
-                    <div className={`text-sm font-semibold ${strong}`}>Agent reply</div>
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${badgeColor}`}>{badgeStatus}</span>
-                  </div>
-                  <div className={`text-[11px] ${soft}`}>{formatMessageTime(message.created_at)}</div>
-                </div>
-              )}
+                  </button>
 
-              <div className="px-4 py-4">
-                <div className={`whitespace-pre-wrap text-[14px] leading-7 ${isInbound ? (isDark ? 'text-slate-200' : 'text-slate-700') : (isDark ? 'text-slate-200' : 'text-slate-700')}`}>
-                  {message.body_html ? (
-                    <iframe
-                      title={`message-${message.id}`}
-                      sandbox=""
-                      srcDoc={message.body_html}
-                      className="min-h-[160px] w-full rounded-xl border bg-white"
-                      style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}
-                    />
+                  {!isExpanded ? (
+                    <div className={`border-t px-4 pb-3 pt-2 text-sm ${isDark ? 'border-slate-800 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+                      {previewText}
+                    </div>
                   ) : (
-                    message.body_text || 'No message content.'
+                    <div className={`border-t px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <div className={`mb-4 flex flex-wrap items-center gap-2 text-[11px] ${soft}`}>
+                        <span className={`rounded-full border px-2 py-1 ${subtle}`}>
+                          {isInbound ? 'Customer message' : 'Agent reply'}
+                        </span>
+                        <span>{formatDetailedMessageTime(message.created_at)}</span>
+                      </div>
+
+                      <div className={`mb-4 rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
+                        <div className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] ${soft}`}>
+                          Message details
+                        </div>
+                        <div className={`grid gap-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={soft}>From:</span>
+                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>
+                              {isInbound ? `${thread.contact_name || 'Customer'} ${message.from_addr || senderEmail}` : `Hello Agent ${message.from_addr || senderEmail}`}
+                            </span>
+                          </div>
+                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={soft}>To:</span>
+                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.to_addr || 'Unknown recipient'}</span>
+                          </div>
+                          <div className={`flex items-start justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={soft}>Subject:</span>
+                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.subject || thread.subject || 'No subject'}</span>
+                          </div>
+                          <div className={`flex items-start justify-between gap-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={soft}>Date:</span>
+                            <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{new Date(message.created_at).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`leading-7 ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        {bodyText}
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {metadata ? (
-                  <details className={`mt-4 rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`} open>
-                    <summary className={`flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] ${soft}`}>
-                      Consultation details
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </summary>
-                    <div className={`mt-3 grid gap-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {Object.entries(metadata).map(([key, value]) => (
-                        <div key={key} className={`flex justify-between gap-3 border-b pb-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                          <span className={soft}>{key.replace(/_/g, ' ')}</span>
-                          <span className={`max-w-[70%] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <div className={`border-t px-5 py-3 text-center text-xs ${soft} ${border}`}>

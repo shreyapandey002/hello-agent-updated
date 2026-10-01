@@ -3,6 +3,8 @@ export type Mailbox = {
   address: string;
   display_name: string | null;
   unread_count: number;
+  incoming_count: number;
+  sent_count: number;
   thread_count: number;
 };
 
@@ -65,11 +67,11 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export async function getMailboxes(): Promise<{ mailboxes: Mailbox[] }> {
+export async function getMailboxes(): Promise<{ mailboxes: Mailbox[]; all_inboxes?: { incoming_count: number; sent_count: number; total_count: number } }> {
   return fetchJson('/api/mailboxes', { method: 'GET' });
 }
 
-export async function getThreads(params: { mailbox?: string; q?: string; filter?: 'all' | 'unread' }): Promise<{ threads: ThreadItem[] }> {
+export async function getThreads(params: { mailbox?: string; q?: string; filter?: 'all' | 'unread'; folder?: 'all' | 'incoming' | 'sent' }): Promise<{ threads: ThreadItem[] }> {
   const query = new URLSearchParams();
 
   if (params.mailbox && params.mailbox !== 'all') {
@@ -80,6 +82,9 @@ export async function getThreads(params: { mailbox?: string; q?: string; filter?
   }
   if (params.filter && params.filter !== 'all') {
     query.set('filter', params.filter);
+  }
+  if (params.folder && params.folder !== 'all') {
+    query.set('folder', params.folder);
   }
 
   const url = `/api/threads${query.toString() ? `?${query.toString()}` : ''}`;

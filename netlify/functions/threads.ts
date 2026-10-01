@@ -21,6 +21,7 @@ export const handler = async (event: any) => {
     const mailbox = String(query.mailbox ?? 'all').trim();
     const q = String(query.q ?? '').trim();
     const filter = String(query.filter ?? 'all').trim();
+    const folder = String(query.folder ?? 'all').trim();
     const mailboxFilter = mailbox && mailbox !== 'all' ? mailbox : null;
     const searchPattern = q ? `%${q}%` : '%';
 
@@ -32,6 +33,12 @@ export const handler = async (event: any) => {
 
     if (filter === 'unread') {
       filterConditions.push(sql`mt.unread = true`);
+    }
+
+    if (folder === 'incoming') {
+      filterConditions.push(sql`EXISTS (SELECT 1 FROM mail_messages m WHERE m.thread_id = mt.id AND m.direction = 'inbound')`);
+    } else if (folder === 'sent') {
+      filterConditions.push(sql`EXISTS (SELECT 1 FROM mail_messages m WHERE m.thread_id = mt.id AND m.direction = 'outbound')`);
     }
 
     if (q !== '') {

@@ -20,6 +20,7 @@ export default function MailboxPage() {
   const [mailboxQuery, setMailboxQuery] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'replied'>('all');
+  const [folder, setFolder] = useState<'all' | 'incoming' | 'sent'>('all');
   const [agentFilter, setAgentFilter] = useState('all');
   const [listLoading, setListLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(false);
@@ -29,6 +30,11 @@ export default function MailboxPage() {
 
   const selectedThreadId = params.threadId ? Number(params.threadId) : null;
   const isDark = theme === 'dark';
+  const allInboxCounts = useMemo(() => ({
+    incoming_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.incoming_count, 0),
+    sent_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.sent_count, 0),
+    total_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.thread_count, 0),
+  }), [mailboxes]);
 
   const unreadTotal = useMemo(
     () => mailboxes.reduce((sum, mailbox) => sum + mailbox.unread_count, 0),
@@ -39,6 +45,11 @@ export default function MailboxPage() {
     const searchParams = new URLSearchParams(location.search);
     const selectedMailbox = searchParams.get('mailbox') || 'all';
     const searchedText = searchParams.get('q') || '';
+    const folderValue = searchParams.get('folder') === 'incoming'
+      ? 'incoming'
+      : searchParams.get('folder') === 'sent'
+        ? 'sent'
+        : 'all';
     const filterValue = searchParams.get('filter') === 'unread'
       ? 'unread'
       : searchParams.get('filter') === 'replied'
@@ -46,6 +57,7 @@ export default function MailboxPage() {
         : 'all';
     setMailboxQuery(selectedMailbox);
     setSearchTerm(searchedText);
+    setFolder(folderValue);
     setFilter(filterValue);
   }, [location.search]);
 
@@ -71,6 +83,7 @@ export default function MailboxPage() {
           mailbox: mailboxQuery,
           q: searchTerm,
           filter: filter === 'unread' ? 'unread' : 'all',
+          folder,
         });
         setThreads(data.threads);
       } catch (error) {
@@ -87,7 +100,7 @@ export default function MailboxPage() {
       window.clearTimeout(timer);
       window.clearInterval(refreshId);
     };
-  }, [listRetryKey, mailboxQuery, searchTerm, filter]);
+  }, [listRetryKey, mailboxQuery, searchTerm, filter, folder]);
 
   useEffect(() => {
     const loadThread = async () => {
@@ -119,6 +132,7 @@ export default function MailboxPage() {
     if (mailboxQuery !== 'all') nextParams.set('mailbox', mailboxQuery);
     if (searchTerm) nextParams.set('q', searchTerm);
     if (filter !== 'all') nextParams.set('filter', filter);
+    if (folder !== 'all') nextParams.set('folder', folder);
 
     const queryString = nextParams.toString();
     const basePath = selectedThreadId ? `/mailbox/${selectedThreadId}` : '/mailbox';
@@ -127,7 +141,7 @@ export default function MailboxPage() {
     if (location.pathname !== basePath || location.search !== (queryString ? `?${queryString}` : '')) {
       navigate(nextUrl, { replace: true });
     }
-  }, [mailboxQuery, searchTerm, filter, selectedThreadId, navigate, location.pathname, location.search]);
+  }, [mailboxQuery, searchTerm, filter, folder, selectedThreadId, navigate, location.pathname, location.search]);
 
   const handleSelectMailbox = (value: string) => {
     setMailboxQuery(value);
@@ -135,7 +149,11 @@ export default function MailboxPage() {
     setSelectedThreadMessages([]);
     setThreadError('');
     if (selectedThreadId) {
-      navigate(value === 'all' ? '/mailbox' : `/mailbox?mailbox=${encodeURIComponent(value)}`);
+      const nextParams = new URLSearchParams();
+      if (value !== 'all') nextParams.set('mailbox', value);
+      if (folder !== 'all') nextParams.set('folder', folder);
+      const queryString = nextParams.toString();
+      navigate(queryString ? `/mailbox?${queryString}` : '/mailbox');
     }
   };
 
@@ -144,6 +162,7 @@ export default function MailboxPage() {
     if (mailboxQuery !== 'all') nextParams.set('mailbox', mailboxQuery);
     if (searchTerm) nextParams.set('q', searchTerm);
     if (filter !== 'all') nextParams.set('filter', filter);
+    if (folder !== 'all') nextParams.set('folder', folder);
 
     const queryString = nextParams.toString();
     navigate(queryString ? `/mailbox/${threadId}?${queryString}` : `/mailbox/${threadId}`);
@@ -168,6 +187,12 @@ export default function MailboxPage() {
     ? 'All inboxes'
     : (mailboxes.find((mailbox) => mailbox.address === mailboxQuery)?.display_name || mailboxQuery);
 
+  const mailboxFolderLabel = folder === 'incoming'
+    ? 'Incoming emails'
+    : folder === 'sent'
+      ? 'Sent emails'
+      : 'All conversations';
+
   return (
     <div className={isDark ? 'h-screen bg-[#111827] text-slate-100' : 'h-screen bg-[#f5f5f4] text-slate-900'}>
       {mailboxError ? (
@@ -188,6 +213,9 @@ export default function MailboxPage() {
             unreadTotal={unreadTotal}
             user={user}
             onSelectMailbox={handleSelectMailbox}
+            onSelectFolder={setFolder}
+            selectedFolder={folder}
+            allInboxCounts={allInboxCounts}
             onLogout={handleLogout}
             isDark={isDark}
           />
@@ -195,7 +223,7 @@ export default function MailboxPage() {
           <ThreadList
             threads={threads}
             selectedThreadId={selectedThreadId}
-            selectedMailboxLabel={selectedMailboxName}
+            selectedMailboxLabel={`${selectedMailboxName} · ${mailboxFolderLabel}`}
             totalThreads={threads.length}
             searchTerm={searchTerm}
             filter={filter}
