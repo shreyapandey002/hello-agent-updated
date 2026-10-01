@@ -20,7 +20,7 @@ export function Sidebar({
   unreadTotal: number;
   user: User | null;
   onSelectMailbox: (address: string) => void;
-  onSelectFolder: (folder: 'all' | 'incoming' | 'sent') => void;
+  onSelectFolder: (folder: 'all' | 'incoming' | 'sent', mailbox: string) => void;
   selectedFolder: 'all' | 'incoming' | 'sent';
   allInboxCounts: { incoming_count: number; sent_count: number; total_count: number };
   onToggleTheme: () => void;
@@ -55,7 +55,7 @@ export function Sidebar({
           type="button"
           onClick={() => {
             onSelectMailbox('all');
-            onSelectFolder('all');
+              onSelectFolder('all', 'all');
           }}
           className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${selectedMailbox === 'all' ? selectedRow : `${rowBase} ${mutedText}`}`}
         >
@@ -76,8 +76,7 @@ export function Sidebar({
                 key={folder.key}
                 type="button"
                 onClick={() => {
-                  onSelectMailbox('all');
-                  onSelectFolder(folder.key);
+                  onSelectFolder(folder.key, 'all');
                 }}
                 className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition ${isActive ? (isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900') : `${rowBase} ${mutedText}`}`}
               >
@@ -104,8 +103,7 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => {
-                    onSelectMailbox(mailbox.address);
-                    onSelectFolder('all');
+                    onSelectFolder('all', mailbox.address);
                   }}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${selectedMailbox === mailbox.address ? selectedRow : `${rowBase} ${mutedText}`}`}
                 >
@@ -126,8 +124,7 @@ export function Sidebar({
                         key={`${mailbox.id}-${folder.key}`}
                         type="button"
                         onClick={() => {
-                          onSelectMailbox(mailbox.address);
-                          onSelectFolder(folder.key);
+                          onSelectFolder(folder.key, mailbox.address);
                         }}
                         className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition ${isActive ? (isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900') : `${rowBase} ${mutedText}`}`}
                       >

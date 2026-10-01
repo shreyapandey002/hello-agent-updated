@@ -25,20 +25,16 @@ export const handler = async (event: any) => {
         COALESCE((SELECT COUNT(*) FROM mail_threads mt WHERE mt.mailbox_id = m.id AND mt.unread = true), 0) AS unread_count,
         COALESCE((SELECT COUNT(*) FROM mail_threads mt WHERE mt.mailbox_id = m.id), 0) AS thread_count,
         COALESCE((
-          SELECT COUNT(DISTINCT mt.id)
-          FROM mail_threads mt
-          WHERE mt.mailbox_id = m.id
-            AND EXISTS (
-              SELECT 1 FROM mail_messages mm WHERE mm.thread_id = mt.id AND mm.direction = 'inbound'
-            )
+          SELECT COUNT(*)
+          FROM mail_messages mm
+          JOIN mail_threads mt ON mt.id = mm.thread_id
+          WHERE mt.mailbox_id = m.id AND mm.direction = 'inbound'
         ), 0) AS incoming_count,
         COALESCE((
-          SELECT COUNT(DISTINCT mt.id)
-          FROM mail_threads mt
-          WHERE mt.mailbox_id = m.id
-            AND EXISTS (
-              SELECT 1 FROM mail_messages mm WHERE mm.thread_id = mt.id AND mm.direction = 'outbound'
-            )
+          SELECT COUNT(*)
+          FROM mail_messages mm
+          JOIN mail_threads mt ON mt.id = mm.thread_id
+          WHERE mt.mailbox_id = m.id AND mm.direction = 'outbound'
         ), 0) AS sent_count
       FROM mailboxes m
       ORDER BY m.address ASC

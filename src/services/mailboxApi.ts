@@ -25,6 +25,7 @@ export type ThreadItem = {
 
 export type MessageItem = {
   id: number;
+  thread_id?: number;
   direction: 'inbound' | 'outbound';
   from_addr: string | null;
   to_addr: string | null;
@@ -35,6 +36,15 @@ export type MessageItem = {
   status: string | null;
   metadata: Record<string, any>;
   created_at: string;
+};
+
+export type EmailListItem = MessageItem & {
+  thread_id: number;
+  mailbox: string;
+  contact_email: string | null;
+  contact_name: string | null;
+  preview: string;
+  thread_unread: boolean;
 };
 
 export type ThreadDetails = {
@@ -71,7 +81,7 @@ export async function getMailboxes(): Promise<{ mailboxes: Mailbox[]; all_inboxe
   return fetchJson('/api/mailboxes', { method: 'GET' });
 }
 
-export async function getThreads(params: { mailbox?: string; q?: string; filter?: 'all' | 'unread'; folder?: 'all' | 'incoming' | 'sent' }): Promise<{ threads: ThreadItem[] }> {
+export async function getThreads(params: { mailbox?: string; q?: string; filter?: 'all' | 'unread'; folder?: 'all' | 'incoming' | 'sent' }): Promise<{ threads?: ThreadItem[]; emails?: EmailListItem[] }> {
   const query = new URLSearchParams();
 
   if (params.mailbox && params.mailbox !== 'all') {
@@ -93,4 +103,8 @@ export async function getThreads(params: { mailbox?: string; q?: string; filter?
 
 export async function getThread(id: string | number): Promise<{ thread: ThreadDetails; messages: MessageItem[] }> {
   return fetchJson(`/api/thread?id=${encodeURIComponent(String(id))}`, { method: 'GET' });
+}
+
+export async function getEmailMessage(id: string | number): Promise<{ thread: ThreadDetails; message: MessageItem }> {
+  return fetchJson(`/api/thread?message_id=${encodeURIComponent(String(id))}`, { method: 'GET' });
 }

@@ -25,6 +25,81 @@ export const handler = async (event: any) => {
     const mailboxFilter = mailbox && mailbox !== 'all' ? mailbox : null;
     const searchPattern = q ? `%${q}%` : '%';
 
+    if (folder === 'incoming' || folder === 'sent') {
+      const direction = folder === 'incoming' ? 'inbound' : 'outbound';
+      const emailConditions: any[] = [sql`mm.direction = ${direction}`];
+
+      if (mailboxFilter) {
+        emailConditions.push(sql`mb.address = ${mailboxFilter}`);
+      }
+      if (filter === 'unread') {
+        emailConditions.push(sql`mt.unread = true`);
+      }
+      if (q) {
+        emailConditions.push(sql`(
+          mm.subject ILIKE ${searchPattern} OR
+          mm.from_addr ILIKE ${searchPattern} OR
+          mm.to_addr ILIKE ${searchPattern} OR
+          mm.body_text ILIKE ${searchPattern} OR
+          mt.contact_email ILIKE ${searchPattern} OR
+          mt.contact_name ILIKE ${searchPattern}
+        )`);
+      }
+
+      const emailWhereClause = sql`WHERE ${emailConditions.slice(1).reduce(
+        (acc, condition) => sql`${acc} AND ${condition}`,
+        emailConditions[0]
+      )}`;
+      const emailRows = await sql`
+        SELECT
+          mm.id,
+          mm.thread_id,
+          mm.direction,
+          mm.from_addr,
+          mm.to_addr,
+          mm.subject,
+          mm.body_text,
+          mm.body_html,
+          mm.agent_name,
+          mm.status,
+          mm.metadata,
+          mm.created_at,
+          mt.contact_email,
+          mt.contact_name,
+          mt.unread AS thread_unread,
+          mb.address AS mailbox,
+          COALESCE(substring(COALESCE(mm.body_text, mm.body_html) FROM 1 FOR 160), '') AS preview
+        FROM mail_messages mm
+        JOIN mail_threads mt ON mt.id = mm.thread_id
+        JOIN mailboxes mb ON mb.id = mt.mailbox_id
+        ${emailWhereClause}
+        ORDER BY mm.created_at DESC NULLS LAST
+        LIMIT 100
+      `;
+
+      return json(200, {
+        emails: emailRows.map((row: any) => ({
+          id: Number(row.id),
+          thread_id: Number(row.thread_id),
+          direction: row.direction,
+          from_addr: row.from_addr,
+          to_addr: row.to_addr,
+          subject: row.subject,
+          body_text: row.body_text,
+          body_html: row.body_html,
+          agent_name: row.agent_name,
+          status: row.status,
+          metadata: row.metadata ?? {},
+          created_at: row.created_at,
+          contact_email: row.contact_email,
+          contact_name: row.contact_name,
+          thread_unread: Boolean(row.thread_unread),
+          mailbox: row.mailbox,
+          preview: row.preview || '',
+        })),
+      });
+    }
+
     const filterConditions: any[] = [];
 
     if (mailboxFilter) {
@@ -33,12 +108,6 @@ export const handler = async (event: any) => {
 
     if (filter === 'unread') {
       filterConditions.push(sql`mt.unread = true`);
-    }
-
-    if (folder === 'incoming') {
-      filterConditions.push(sql`EXISTS (SELECT 1 FROM mail_messages m WHERE m.thread_id = mt.id AND m.direction = 'inbound')`);
-    } else if (folder === 'sent') {
-      filterConditions.push(sql`EXISTS (SELECT 1 FROM mail_messages m WHERE m.thread_id = mt.id AND m.direction = 'outbound')`);
     }
 
     if (q !== '') {

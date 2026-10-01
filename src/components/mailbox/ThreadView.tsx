@@ -139,6 +139,7 @@ export function ThreadView({
   messages,
   loading,
   error,
+  folder,
   onRetry,
   onBack,
   isDark,
@@ -147,6 +148,7 @@ export function ThreadView({
   messages: MessageItem[];
   loading: boolean;
   error: string;
+  folder: 'all' | 'incoming' | 'sent';
   onRetry: () => void;
   onBack: () => void;
   isDark: boolean;
@@ -229,9 +231,9 @@ export function ThreadView({
       <div className={`min-w-0 shrink-0 border-b px-5 py-4 ${border}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className={`break-words [overflow-wrap:anywhere] text-[18px] font-semibold ${strong}`}>{thread.subject || 'No subject'}</h2>
+            <h2 className={`break-words [overflow-wrap:anywhere] text-[18px] font-semibold ${strong}`}>{orderedMessages[0]?.subject || thread.subject || 'No subject'}</h2>
             <div className={`mt-1 text-sm ${soft}`}>
-              <span className="break-all">{thread.mailbox}</span> · {orderedMessages.length} messages
+              <span className="break-all">{thread.mailbox}</span> · {folder === 'all' ? `${orderedMessages.length} messages` : 'Individual email'}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -239,12 +241,16 @@ export function ThreadView({
               <ChevronLeft className="h-3.5 w-3.5" />
               Inbox
             </button>
-            <button type="button" onClick={expandAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
-              Expand all
-            </button>
-            <button type="button" onClick={collapseAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
-              Collapse all
-            </button>
+            {folder === 'all' ? (
+              <>
+                <button type="button" onClick={expandAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                  Expand all
+                </button>
+                <button type="button" onClick={collapseAll} className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                  Collapse all
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -344,6 +350,16 @@ export function ThreadView({
                             <span className={soft}>Date:</span>
                             <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{formatDetailedMessageTime(message.created_at)}</span>
                           </div>
+                          <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-t pt-2 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={soft}>Status:</span>
+                            <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.status || (isInbound ? 'Received' : 'Sent')}</span>
+                          </div>
+                          {message.agent_name ? (
+                            <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                              <span className={soft}>Agent:</span>
+                              <span className={`min-w-0 break-words [overflow-wrap:anywhere] text-right ${isDark ? 'text-slate-100' : 'text-slate-700'}`}>{message.agent_name}</span>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -376,7 +392,7 @@ export function ThreadView({
       </div>
 
       <div className={`shrink-0 border-t px-5 py-3 text-center text-xs ${soft} ${border}`}>
-        Read-only view of agent conversations
+        {folder === 'all' ? 'Read-only view of agent conversations' : 'Read-only view of this email'}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { ChevronDown, Search, Sparkles, Tag, X } from 'lucide-react';
-import type { ThreadItem } from '../../services/mailboxApi';
+import type { EmailListItem, ThreadItem } from '../../services/mailboxApi';
 
 function formatRelativeTime(value: string | null) {
   if (!value) return 'just now';
@@ -17,13 +17,13 @@ function formatRelativeTime(value: string | null) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function getContactInitial(thread: ThreadItem) {
-  const source = thread.contact_name || thread.contact_email || 'A';
+function getContactInitial(source: string | null | undefined = 'A') {
   return source.charAt(0).toUpperCase();
 }
 
 export function ThreadList({
   threads,
+  folder,
   selectedThreadId,
   selectedMailboxLabel,
   totalThreads,
@@ -39,7 +39,8 @@ export function ThreadList({
   loading,
   isDark,
 }: {
-  threads: ThreadItem[];
+  threads: Array<ThreadItem | EmailListItem>;
+  folder: 'all' | 'incoming' | 'sent';
   selectedThreadId: number | null;
   selectedMailboxLabel: string;
   totalThreads: number;
@@ -55,13 +56,21 @@ export function ThreadList({
   loading: boolean;
   isDark: boolean;
 }) {
-  const unreadTotal = threads.filter((thread) => thread.unread).length;
-  const repliedTotal = threads.filter((thread) => thread.last_direction === 'outbound' && thread.last_status !== 'failed').length;
+  const isEmail = (item: ThreadItem | EmailListItem): item is EmailListItem => 'thread_id' in item;
+  const unreadTotal = threads.filter((item) => isEmail(item) ? item.thread_unread : item.unread).length;
+  const repliedTotal = threads.filter((item) => isEmail(item)
+    ? item.direction === 'outbound' && item.status !== 'failed'
+    : item.last_direction === 'outbound' && item.last_status !== 'failed').length;
 
-  const visibleThreads = threads.filter((thread) => {
-    if (filter === 'unread' && !thread.unread) return false;
-    if (filter === 'replied' && !(thread.last_direction === 'outbound' && thread.last_status !== 'failed')) return false;
-    if (agentFilter !== 'all' && (thread.last_agent || '') !== agentFilter) return false;
+  const visibleThreads = threads.filter((item) => {
+    const unread = isEmail(item) ? item.thread_unread : item.unread;
+    const isReplied = isEmail(item)
+      ? item.direction === 'outbound' && item.status !== 'failed'
+      : item.last_direction === 'outbound' && item.last_status !== 'failed';
+    const agent = isEmail(item) ? item.agent_name : item.last_agent;
+    if (filter === 'unread' && !unread) return false;
+    if (filter === 'replied' && !isReplied) return false;
+    if (agentFilter !== 'all' && (agent || '') !== agentFilter) return false;
     return true;
   });
 
@@ -107,7 +116,7 @@ export function ThreadList({
             <div className={`min-w-0 break-words text-[11px] font-medium ${strong}`}>{selectedMailboxLabel}</div>
           </div>
           <div className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${chip}`}>
-            {totalThreads} {totalThreads === 1 ? 'thread' : 'threads'}
+            {totalThreads} {folder === 'all' ? (totalThreads === 1 ? 'conversation' : 'conversations') : (totalThreads === 1 ? 'email' : 'emails')}
           </div>
         </div>
 
@@ -116,7 +125,7 @@ export function ThreadList({
           <input
             value={searchTerm}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search conversations"
+            placeholder={folder === 'all' ? 'Search conversations' : 'Search emails'}
             className={`w-full rounded-xl border py-2.5 pl-9 pr-10 text-sm outline-none focus:border-slate-400 ${field}`}
           />
           {!searchTerm ? (
@@ -173,50 +182,71 @@ export function ThreadList({
           </div>
         ) : visibleThreads.length > 0 ? (
           <div className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-200'}`}>
-            {visibleThreads.map((thread) => {
-              const isSelected = thread.id === selectedThreadId;
-              const chips = getThreadListChips(thread);
-              const badgeTone = thread.last_status === 'failed'
+            {visibleThreads.map((item) => {
+              const email = isEmail(item) ? item : null;
+              const conversation = email ? null : item as ThreadItem;
+              const id = item.id;
+              const isSelected = id === selectedThreadId;
+              const unread = email?.thread_unread ?? conversation?.unread ?? false;
+              const direction = email?.direction ?? conversation?.last_direction;
+              const status = email ? email.status : conversation?.last_status;
+              const agent = email ? email.agent_name : conversation?.last_agent;
+              const displayName = email
+                ? folder === 'sent'
+                  ? (email.to_addr || email.contact_name || email.contact_email || 'Unknown recipient')
+                  : (email.from_addr || email.contact_name || email.contact_email || 'Unknown sender')
+                : (conversation?.contact_name || conversation?.contact_email || 'Unknown contact');
+              const subject = email?.subject || conversation?.subject || 'No subject';
+              const preview = email?.preview || conversation?.preview || 'No preview available.';
+              const timestamp = email?.created_at || conversation?.last_message_at;
+              const mailbox = email?.mailbox || conversation?.mailbox || '';
+              const chips = email
+                ? [
+                    ...(folder === 'sent' && agent ? [{ label: 'Agent', value: agent }] : []),
+                    { label: 'Status', value: status || (folder === 'incoming' ? 'Received' : 'Sent') },
+                  ]
+                : getThreadListChips(conversation!);
+              const badgeTone = status === 'failed'
                 ? badgeDanger
-                : thread.last_direction === 'outbound' && thread.last_status !== 'failed'
+                : direction === 'outbound' && status !== 'failed'
                   ? badgeSuccess
                   : badgeNeutral;
 
               return (
                 <button
-                  key={thread.id}
+                  key={id}
                   type="button"
-                  onClick={() => onSelectThread(thread.id)}
+                  onClick={() => onSelectThread(id)}
                   className={`block w-full border-l-2 px-3 py-3 text-left transition ${isSelected ? `border-slate-900 ${rowSelected}` : `border-transparent ${rowHover}`}`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: thread.unread ? '#111827' : '#e5e7eb', color: thread.unread ? '#f8fafc' : '#374151' }}>
-                      {getContactInitial(thread)}
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: unread ? '#111827' : '#e5e7eb', color: unread ? '#f8fafc' : '#374151' }}>
+                      {getContactInitial(displayName || 'A')}
                     </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <div className={`truncate text-sm font-semibold ${thread.unread ? strong : soft}`}>
-                          {thread.contact_name || thread.contact_email || 'Unknown contact'}
+                        <div className={`truncate text-sm font-semibold ${unread ? strong : soft}`}>
+                          {displayName}
                         </div>
-                        <div className={`shrink-0 text-[10px] ${muted}`}>{formatRelativeTime(thread.last_message_at)}</div>
+                        <div className={`shrink-0 text-[10px] ${muted}`}>{formatRelativeTime(timestamp)}</div>
                       </div>
 
-                      <div className={`mt-1 truncate text-[13px] ${thread.unread ? strong : soft}`}>
-                        {thread.subject || 'No subject'}
+                      <div className={`mt-1 truncate text-[13px] ${unread ? strong : soft}`}>
+                        {subject}
                       </div>
 
-                      <div className={`mt-1 truncate text-xs ${muted}`}>{thread.preview || 'No preview available.'}</div>
+                      <div className={`mt-1 truncate text-xs ${muted}`}>{preview}</div>
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {thread.unread ? <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> : null}
+                        {unread ? <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> : null}
                         {chips.map((chipItem) => (
-                          <span key={`${thread.id}-${chipItem.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
+                          <span key={`${id}-${chipItem.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
                             <span className="opacity-70">{chipItem.label}:</span>
                             <span>{chipItem.value}</span>
                           </span>
                         ))}
-                        <span className={`text-[10px] ${muted}`}>{thread.mailbox}</span>
+                        <span className={`text-[10px] ${muted}`}>{mailbox}</span>
                       </div>
                     </div>
                   </div>
@@ -227,7 +257,7 @@ export function ThreadList({
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center">
             <div>
-              <div className={`text-lg font-semibold ${strong}`}>No conversations yet</div>
+              <div className={`text-lg font-semibold ${strong}`}>{folder === 'all' ? 'No conversations yet' : 'No emails yet'}</div>
               <div className={`mt-2 text-sm ${muted}`}>Try a different inbox or search query.</div>
               {searchTerm || filter !== 'all' || agentFilter !== 'all' ? (
                 <button type="button" onClick={() => { onSearchChange(''); onFilterChange('all'); onAgentFilterChange('all'); }} className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-700">
@@ -241,7 +271,7 @@ export function ThreadList({
 
       {!loading && visibleThreads.length === 0 ? (
         <div className={`border-t px-3 py-2 text-center text-xs ${muted}`}>
-          {searchTerm || filter !== 'all' || agentFilter !== 'all' ? 'No matches found' : 'No threads available'}
+          {searchTerm || filter !== 'all' || agentFilter !== 'all' ? 'No matches found' : folder === 'all' ? 'No conversations available' : 'No emails available'}
         </div>
       ) : null}
     </div>

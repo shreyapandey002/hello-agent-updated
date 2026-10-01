@@ -17,6 +17,73 @@ export const handler = async (event: any) => {
   }
 
   try {
+    const messageIdRaw = event.queryStringParameters?.message_id;
+    if (messageIdRaw) {
+      const messageId = Number(messageIdRaw);
+      if (!Number.isFinite(messageId) || messageId <= 0) {
+        return json(400, { error: 'Message id is invalid' });
+      }
+
+      const rows = await sql`
+        SELECT
+          mt.id AS thread_id,
+          mt.subject AS thread_subject,
+          mt.contact_email,
+          mt.contact_name,
+          mt.last_message_at,
+          mt.unread,
+          mb.address AS mailbox,
+          mm.id,
+          mm.direction,
+          mm.from_addr,
+          mm.to_addr,
+          mm.subject,
+          mm.body_text,
+          mm.body_html,
+          mm.agent_name,
+          mm.status,
+          mm.metadata,
+          mm.created_at
+        FROM mail_messages mm
+        JOIN mail_threads mt ON mt.id = mm.thread_id
+        JOIN mailboxes mb ON mb.id = mt.mailbox_id
+        WHERE mm.id = ${messageId}
+        LIMIT 1
+      `;
+      const row = rows[0];
+      if (!row) {
+        return json(404, { error: 'Email not found' });
+      }
+
+      await sql`UPDATE mail_threads SET unread = false WHERE id = ${row.thread_id}`;
+
+      return json(200, {
+        thread: {
+          id: Number(row.thread_id),
+          subject: row.thread_subject,
+          contact_email: row.contact_email,
+          contact_name: row.contact_name,
+          mailbox: row.mailbox,
+          last_message_at: row.last_message_at,
+          unread: false,
+        },
+        message: {
+          id: Number(row.id),
+          thread_id: Number(row.thread_id),
+          direction: row.direction,
+          from_addr: row.from_addr,
+          to_addr: row.to_addr,
+          subject: row.subject,
+          body_text: row.body_text,
+          body_html: row.body_html,
+          agent_name: row.agent_name,
+          status: row.status,
+          metadata: row.metadata ?? {},
+          created_at: row.created_at,
+        },
+      });
+    }
+
     const threadIdRaw = event.queryStringParameters?.id;
     const threadId = Number(threadIdRaw);
 

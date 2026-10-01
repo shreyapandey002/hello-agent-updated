@@ -5,7 +5,7 @@ import { ThreadList } from '../components/mailbox/ThreadList';
 import { ThreadView } from '../components/mailbox/ThreadView';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../ThemeContext';
-import { getMailboxes, getThread, getThreads, type Mailbox, type MessageItem, type ThreadDetails, type ThreadItem } from '../services/mailboxApi';
+import { getEmailMessage, getMailboxes, getThread, getThreads, type EmailListItem, type Mailbox, type MessageItem, type ThreadDetails, type ThreadItem } from '../services/mailboxApi';
 
 export default function MailboxPage() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function MailboxPage() {
   const location = useLocation();
   const params = useParams();
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
-  const [threads, setThreads] = useState<ThreadItem[]>([]);
+  const [threads, setThreads] = useState<Array<ThreadItem | EmailListItem>>([]);
   const [selectedThread, setSelectedThread] = useState<ThreadDetails | null>(null);
   const [selectedThreadMessages, setSelectedThreadMessages] = useState<MessageItem[]>([]);
   const [mailboxQuery, setMailboxQuery] = useState('all');
@@ -85,7 +85,7 @@ export default function MailboxPage() {
           filter: filter === 'unread' ? 'unread' : 'all',
           folder,
         });
-        setThreads(data.threads);
+        setThreads(folder === 'all' ? data.threads || [] : data.emails || []);
       } catch (error) {
         setMailboxError(error instanceof Error ? error.message : 'Unable to load threads');
       } finally {
@@ -114,9 +114,15 @@ export default function MailboxPage() {
       try {
         setThreadLoading(true);
         setThreadError('');
-        const data = await getThread(selectedThreadId);
-        setSelectedThread(data.thread);
-        setSelectedThreadMessages(data.messages);
+        if (folder === 'all') {
+          const data = await getThread(selectedThreadId);
+          setSelectedThread(data.thread);
+          setSelectedThreadMessages(data.messages);
+        } else {
+          const data = await getEmailMessage(selectedThreadId);
+          setSelectedThread(data.thread);
+          setSelectedThreadMessages([data.message]);
+        }
         void getMailboxes()
           .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
           .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
@@ -128,7 +134,7 @@ export default function MailboxPage() {
     };
 
     loadThread();
-  }, [selectedThreadId]);
+  }, [selectedThreadId, folder]);
 
   useEffect(() => {
     const nextParams = new URLSearchParams();
@@ -160,6 +166,23 @@ export default function MailboxPage() {
     }
   };
 
+  const handleSelectFolder = (value: 'all' | 'incoming' | 'sent', mailbox: string) => {
+    setMailboxQuery(mailbox);
+    setFolder(value);
+    setSelectedThread(null);
+    setSelectedThreadMessages([]);
+    setThreadError('');
+    if (selectedThreadId) {
+      const nextParams = new URLSearchParams();
+      if (mailbox !== 'all') nextParams.set('mailbox', mailbox);
+      if (searchTerm) nextParams.set('q', searchTerm);
+      if (filter !== 'all') nextParams.set('filter', filter);
+      if (value !== 'all') nextParams.set('folder', value);
+      const queryString = nextParams.toString();
+      navigate(queryString ? `/mailbox?${queryString}` : '/mailbox');
+    }
+  };
+
   const handleSelectThread = (threadId: number) => {
     const nextParams = new URLSearchParams();
     if (mailboxQuery !== 'all') nextParams.set('mailbox', mailboxQuery);
@@ -175,7 +198,7 @@ export default function MailboxPage() {
     const uniqueAgents = Array.from(
       new Set(
         threads
-          .map((thread) => thread.last_agent)
+          .map((thread) => ('thread_id' in thread ? thread.agent_name : thread.last_agent))
           .filter((agent): agent is string => Boolean(agent))
       )
     );
@@ -217,7 +240,7 @@ export default function MailboxPage() {
               unreadTotal={unreadTotal}
               user={user}
               onSelectMailbox={handleSelectMailbox}
-              onSelectFolder={setFolder}
+              onSelectFolder={handleSelectFolder}
               selectedFolder={folder}
               allInboxCounts={allInboxCounts}
               onToggleTheme={toggleTheme}
@@ -229,6 +252,7 @@ export default function MailboxPage() {
           <div className={`flex h-full min-h-0 w-[clamp(190px,30vw,440px)] min-w-0 shrink-0 ${selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
             <ThreadList
               threads={threads}
+              folder={folder}
               selectedThreadId={selectedThreadId}
               selectedMailboxLabel={`${selectedMailboxName} · ${mailboxFolderLabel}`}
               totalThreads={threads.length}
@@ -252,15 +276,20 @@ export default function MailboxPage() {
               messages={selectedThreadMessages}
               loading={threadLoading}
               error={threadError}
+              folder={folder}
               onBack={() => navigate('/mailbox' + location.search)}
-              onRetry={() => selectedThreadId && getThread(selectedThreadId).then((data) => {
-                setSelectedThread(data.thread);
-                setSelectedThreadMessages(data.messages);
-                setThreadError('');
-                void getMailboxes()
-                  .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
-                  .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
-              }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load thread'))}
+              onRetry={() => {
+                if (!selectedThreadId) return;
+                const loadDetail = folder === 'all' ? getThread(selectedThreadId) : getEmailMessage(selectedThreadId);
+                void loadDetail.then((data) => {
+                  setSelectedThread(data.thread);
+                  setSelectedThreadMessages('messages' in data ? data.messages : [data.message]);
+                  setThreadError('');
+                  void getMailboxes()
+                    .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
+                    .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
+                }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load email'));
+              }}
               isDark={isDark}
             />
           </div>
