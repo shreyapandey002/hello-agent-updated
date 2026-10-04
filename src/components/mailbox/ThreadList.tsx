@@ -107,7 +107,7 @@ export function ThreadList({
   };
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col border-r ${shell}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r ${shell}`}>
       <div className={`shrink-0 border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -173,7 +173,7 @@ export function ThreadList({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className={`${folder !== 'all' ? 'mr-2 ' : ''}min-h-0 flex-1 overflow-y-auto overscroll-y-contain`}>
         {loading ? (
           <div className="space-y-2 p-3">
             {Array.from({ length: 6 }).map((_, index) => (

@@ -1,5 +1,5 @@
 import { AlertTriangle, ChevronDown, ChevronLeft } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MessageItem, ThreadDetails } from '../../services/mailboxApi';
 
 function formatMessageTime(value: string) {
@@ -158,6 +158,7 @@ export function ThreadView({
   const soft = isDark ? 'text-slate-400' : 'text-slate-500';
   const strong = isDark ? 'text-slate-100' : 'text-slate-900';
   const card = isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white';
+  const isIndividualEmail = folder !== 'all';
 
   const orderedMessages = useMemo(
     () => [...messages].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
@@ -165,7 +166,6 @@ export function ThreadView({
   );
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const orderedMessageIds = orderedMessages.map((message) => message.id).join(',');
 
   useEffect(() => {
@@ -177,18 +177,6 @@ export function ThreadView({
     const lastMessageId = orderedMessages[orderedMessages.length - 1]?.id;
     setExpandedIds(new Set(lastMessageId ? [lastMessageId] : []));
   }, [thread?.id, orderedMessageIds]);
-
-  useEffect(() => {
-    if (loading) return;
-    const container = messagesContainerRef.current;
-    if (!container || !orderedMessages.length) return;
-
-    const frame = requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [loading, thread?.id, orderedMessageIds]);
 
   const expandAll = () => setExpandedIds(new Set(orderedMessages.map((message) => message.id)));
   const collapseAll = () => setExpandedIds(new Set());
@@ -259,7 +247,7 @@ export function ThreadView({
         </div>
       </div>
 
-      <div ref={messagesContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5">
+      <div className={`${isIndividualEmail ? 'mr-2 ' : ''}min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5`}>
         <div className="space-y-4">
           {orderedMessages.map((message, index) => {
             const isInbound = message.direction === 'inbound';
@@ -278,16 +266,19 @@ export function ThreadView({
             const initials = (senderName || 'A').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
             return (
-              <div key={message.id} className="relative pl-7">
-                {index < orderedMessages.length - 1 ? (
+              <div key={message.id} className={isIndividualEmail ? 'min-w-0' : 'relative pl-7'}>
+                {!isIndividualEmail && index < orderedMessages.length - 1 ? (
                   <div className={`absolute left-[15px] top-0 h-full w-px ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
                 ) : null}
-                <div className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${isDark ? 'border-slate-900 bg-sky-500' : 'border-white bg-sky-600'}`} />
+                {!isIndividualEmail ? (
+                  <div className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${isDark ? 'border-slate-900 bg-sky-500' : 'border-white bg-sky-600'}`} />
+                ) : null}
 
                 <div className={`min-w-0 rounded-2xl border ${card}`}>
                   <button
                     type="button"
-                    onClick={() => setExpandedIds((current) => {
+                    disabled={isIndividualEmail}
+                    onClick={isIndividualEmail ? undefined : () => setExpandedIds((current) => {
                       const next = new Set(current);
                       if (next.has(message.id)) {
                         next.delete(message.id);
@@ -320,12 +311,14 @@ export function ThreadView({
 
                       <div className="flex shrink-0 items-center gap-2 text-[11px] text-slate-500">
                         <span className={soft}>{formatMessageTime(message.created_at)}</span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        {!isIndividualEmail ? (
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        ) : null}
                       </div>
                     </div>
                   </button>
 
-                  {!isExpanded ? (
+                  {!isExpanded && !isIndividualEmail ? (
                     <div className={`border-t px-4 pb-3 pt-2 text-sm ${isDark ? 'border-slate-800 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
                       {previewText}
                     </div>
