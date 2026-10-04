@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Sidebar } from '../components/mailbox/Sidebar';
 import { ThreadList } from '../components/mailbox/ThreadList';
@@ -13,20 +13,30 @@ export default function MailboxPage() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const params = useParams();
+  const initialSearchParams = new URLSearchParams(location.search);
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [threads, setThreads] = useState<Array<ThreadItem | EmailListItem>>([]);
   const [selectedThread, setSelectedThread] = useState<ThreadDetails | null>(null);
   const [selectedThreadMessages, setSelectedThreadMessages] = useState<MessageItem[]>([]);
-  const [mailboxQuery, setMailboxQuery] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread' | 'replied'>('all');
-  const [folder, setFolder] = useState<'all' | 'incoming' | 'sent'>('all');
+  const [mailboxQuery, setMailboxQuery] = useState(initialSearchParams.get('mailbox') || 'all');
+  const [searchTerm, setSearchTerm] = useState(initialSearchParams.get('q') || '');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'replied'>(() => {
+    const value = initialSearchParams.get('filter');
+    return value === 'unread' || value === 'replied' ? value : 'all';
+  });
+  const [folder, setFolder] = useState<'all' | 'incoming' | 'sent'>(() => {
+    const value = initialSearchParams.get('folder');
+    return value === 'incoming' || value === 'sent' ? value : 'all';
+  });
   const [agentFilter, setAgentFilter] = useState('all');
   const [listLoading, setListLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState('');
   const [mailboxError, setMailboxError] = useState('');
   const [listRetryKey, setListRetryKey] = useState(0);
+  const [threadRetryKey, setThreadRetryKey] = useState(0);
+  const threadRequestId = useRef(0);
+  const previousSearch = useRef(location.search);
 
   const selectedThreadId = params.threadId ? Number(params.threadId) : null;
   const isDark = theme === 'dark';
@@ -76,7 +86,9 @@ export default function MailboxPage() {
   }, [listRetryKey]);
 
   useEffect(() => {
+    let latestRequest = 0;
     const loadThreads = async () => {
+      const requestId = ++latestRequest;
       try {
         setListLoading(true);
         const data = await getThreads({
@@ -85,29 +97,36 @@ export default function MailboxPage() {
           filter: filter === 'unread' ? 'unread' : 'all',
           folder,
         });
+        if (!active || requestId !== latestRequest) return;
         setThreads(folder === 'all' ? data.threads || [] : data.emails || []);
       } catch (error) {
+        if (!active || requestId !== latestRequest) return;
         setMailboxError(error instanceof Error ? error.message : 'Unable to load threads');
       } finally {
-        setListLoading(false);
+        if (active && requestId === latestRequest) setListLoading(false);
       }
     };
 
+    let active = true;
     const timer = window.setTimeout(loadThreads, 300);
     const refreshId = window.setInterval(loadThreads, 30000);
 
     return () => {
+      active = false;
       window.clearTimeout(timer);
       window.clearInterval(refreshId);
     };
   }, [listRetryKey, mailboxQuery, searchTerm, filter, folder]);
 
   useEffect(() => {
+    const requestId = ++threadRequestId.current;
+    let active = true;
     const loadThread = async () => {
       if (!selectedThreadId) {
         setSelectedThread(null);
         setSelectedThreadMessages([]);
         setThreadError('');
+        setThreadLoading(false);
         return;
       }
 
@@ -116,27 +135,46 @@ export default function MailboxPage() {
         setThreadError('');
         if (folder === 'all') {
           const data = await getThread(selectedThreadId);
+          if (!active || requestId !== threadRequestId.current) return;
           setSelectedThread(data.thread);
           setSelectedThreadMessages(data.messages);
         } else {
           const data = await getEmailMessage(selectedThreadId);
+          if (!active || requestId !== threadRequestId.current) return;
           setSelectedThread(data.thread);
           setSelectedThreadMessages([data.message]);
         }
         void getMailboxes()
-          .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
-          .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
+          .then((mailboxData) => {
+            if (active && requestId === threadRequestId.current) setMailboxes(mailboxData.mailboxes);
+          })
+          .catch((refreshError) => {
+            if (active && requestId === threadRequestId.current) {
+              setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes');
+            }
+          });
       } catch (error) {
-        setThreadError(error instanceof Error ? error.message : 'Unable to load thread');
+        if (active && requestId === threadRequestId.current) {
+          setThreadError(error instanceof Error ? error.message : 'Unable to load thread');
+        }
       } finally {
-        setThreadLoading(false);
+        if (active && requestId === threadRequestId.current) setThreadLoading(false);
       }
     };
 
-    loadThread();
-  }, [selectedThreadId, folder]);
+    void loadThread();
+    return () => {
+      active = false;
+      if (requestId === threadRequestId.current) threadRequestId.current += 1;
+    };
+  }, [selectedThreadId, folder, threadRetryKey]);
 
   useEffect(() => {
+    if (previousSearch.current !== location.search) {
+      previousSearch.current = location.search;
+      return;
+    }
+
     const nextParams = new URLSearchParams();
     if (mailboxQuery !== 'all') nextParams.set('mailbox', mailboxQuery);
     if (searchTerm) nextParams.set('q', searchTerm);
@@ -270,7 +308,7 @@ export default function MailboxPage() {
             />
           </div>
 
-          <div className={`flex min-h-0 min-w-0 flex-1 ${!selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
+          <div className={`flex h-full min-h-0 min-w-0 flex-1 overflow-hidden ${!selectedThreadId ? 'max-[767px]:hidden' : ''}`}>
             <ThreadView
               thread={selectedThread}
               messages={selectedThreadMessages}
@@ -278,18 +316,7 @@ export default function MailboxPage() {
               error={threadError}
               folder={folder}
               onBack={() => navigate('/mailbox' + location.search)}
-              onRetry={() => {
-                if (!selectedThreadId) return;
-                const loadDetail = folder === 'all' ? getThread(selectedThreadId) : getEmailMessage(selectedThreadId);
-                void loadDetail.then((data) => {
-                  setSelectedThread(data.thread);
-                  setSelectedThreadMessages('messages' in data ? data.messages : [data.message]);
-                  setThreadError('');
-                  void getMailboxes()
-                    .then((mailboxData) => setMailboxes(mailboxData.mailboxes))
-                    .catch((refreshError) => setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes'));
-                }).catch((error) => setThreadError(error instanceof Error ? error.message : 'Unable to load email'));
-              }}
+              onRetry={() => setThreadRetryKey((value) => value + 1)}
               isDark={isDark}
             />
           </div>

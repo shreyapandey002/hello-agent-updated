@@ -166,6 +166,7 @@ export function ThreadView({
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const orderedMessageIds = orderedMessages.map((message) => message.id).join(',');
 
   useEffect(() => {
     if (!orderedMessages.length) {
@@ -175,23 +176,26 @@ export function ThreadView({
 
     const lastMessageId = orderedMessages[orderedMessages.length - 1]?.id;
     setExpandedIds(new Set(lastMessageId ? [lastMessageId] : []));
-  }, [orderedMessages]);
+  }, [thread?.id, orderedMessageIds]);
 
   useEffect(() => {
+    if (loading) return;
     const container = messagesContainerRef.current;
     if (!container || !orderedMessages.length) return;
 
-    requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    const frame = requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
     });
-  }, [thread?.id, orderedMessages.length, expandedIds]);
+
+    return () => cancelAnimationFrame(frame);
+  }, [loading, thread?.id, orderedMessageIds]);
 
   const expandAll = () => setExpandedIds(new Set(orderedMessages.map((message) => message.id)));
   const collapseAll = () => setExpandedIds(new Set());
 
   if (loading) {
     return (
-      <div className={`flex h-full items-center justify-center p-6 ${shell}`}>
+      <div className={`flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden p-6 ${shell}`}>
         <div className={`space-y-4 text-center ${soft}`}>
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
           <div>Loading conversation…</div>
@@ -202,7 +206,7 @@ export function ThreadView({
 
   if (error) {
     return (
-      <div className={`flex h-full items-center justify-center p-6 ${shell}`}>
+      <div className={`flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden p-6 ${shell}`}>
         <div className={isDark ? 'max-w-md rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-center text-red-200' : 'max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700'}>
           <div className="mb-2 flex justify-center"><AlertTriangle className="h-6 w-6" /></div>
           <div className="font-semibold">Unable to load this thread</div>
@@ -217,7 +221,7 @@ export function ThreadView({
 
   if (!thread) {
     return (
-      <div className={`flex h-full items-center justify-center p-6 text-center ${shell}`}>
+      <div className={`flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden p-6 text-center ${shell}`}>
         <div>
           <div className={`text-xl font-semibold ${strong}`}>Select a conversation</div>
           <div className={`mt-2 text-sm ${soft}`}>Choose a thread to read the full email history.</div>
@@ -227,7 +231,7 @@ export function ThreadView({
   }
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col ${shell}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${shell}`}>
       <div className={`min-w-0 shrink-0 border-b px-5 py-4 ${border}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -255,7 +259,7 @@ export function ThreadView({
         </div>
       </div>
 
-      <div ref={messagesContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5">
+      <div ref={messagesContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5">
         <div className="space-y-4">
           {orderedMessages.map((message, index) => {
             const isInbound = message.direction === 'inbound';
