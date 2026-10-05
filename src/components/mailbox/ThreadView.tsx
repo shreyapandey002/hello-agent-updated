@@ -47,6 +47,8 @@ function buildWordBoundedPreview(value: string | null | undefined) {
   const safeSlice = lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, maxLength);
 
   return `${safeSlice.trimEnd()}…`;
+}
+
 function formatAttachmentSize(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
