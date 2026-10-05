@@ -107,7 +107,7 @@ export function ThreadList({
   };
 
   return (
-    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r ${shell}`}>
+    <div className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${shell}`}>
       <div className={`shrink-0 border-b px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -173,7 +173,7 @@ export function ThreadList({
         </div>
       </div>
 
-      <div className={`${folder !== 'all' ? 'mr-2 ' : ''}min-h-0 flex-1 overflow-y-auto overscroll-y-contain`}>
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
         {loading ? (
           <div className="space-y-2 p-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -217,36 +217,38 @@ export function ThreadList({
                   key={id}
                   type="button"
                   onClick={() => onSelectThread(id)}
-                  className={`block w-full border-l-2 px-3 py-3 text-left transition ${isSelected ? `border-slate-900 ${rowSelected}` : `border-transparent ${rowHover}`}`}
+                  className={`block w-full min-w-0 border-l-2 px-4 py-3 pr-5 text-left box-border transition ${isSelected ? `border-slate-900 ${rowSelected}` : `border-transparent ${rowHover}`}`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: unread ? '#111827' : '#e5e7eb', color: unread ? '#f8fafc' : '#374151' }}>
                       {getContactInitial(displayName || 'A')}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className={`truncate text-sm font-semibold ${unread ? strong : soft}`}>
+                      <div className="flex min-w-0 items-center justify-between gap-3">
+                        <div className={`min-w-0 truncate text-sm font-semibold ${unread ? strong : soft}`}>
                           {displayName}
                         </div>
-                        <div className={`shrink-0 text-[10px] ${muted}`}>{formatRelativeTime(timestamp)}</div>
+                        <div className={`ml-3 shrink-0 whitespace-nowrap text-[10px] ${muted}`}>{formatRelativeTime(timestamp)}</div>
                       </div>
 
                       <div className={`mt-1 truncate text-[13px] ${unread ? strong : soft}`}>
                         {subject}
                       </div>
 
-                      <div className={`mt-1 truncate text-xs ${muted}`}>{preview}</div>
+                      <p className={`mt-1 text-xs leading-snug ${muted} break-words [overflow-wrap:anywhere]`}>
+                        {preview}
+                      </p>
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
                         {unread ? <span className="h-2.5 w-2.5 rounded-full bg-slate-900" /> : null}
                         {chips.map((chipItem) => (
-                          <span key={`${id}-${chipItem.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
+                          <span key={`${id}-${chipItem.label}`} className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-medium ${badgeTone}`}>
                             <span className="opacity-70">{chipItem.label}:</span>
-                            <span>{chipItem.value}</span>
+                            <span className="break-words [overflow-wrap:anywhere]">{chipItem.value}</span>
                           </span>
                         ))}
-                        <span className={`text-[10px] ${muted}`}>{mailbox}</span>
+                        <span className={`max-w-full break-words text-[10px] [overflow-wrap:anywhere] ${muted}`}>{mailbox}</span>
                       </div>
                     </div>
                   </div>

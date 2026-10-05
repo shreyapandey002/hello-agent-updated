@@ -7,7 +7,6 @@ interface DemoModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
 const timePickerPeriods = ['AM', 'PM'];
 const timePickerItemHeight = 44;
 const allowedTimeMinutes = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0'));

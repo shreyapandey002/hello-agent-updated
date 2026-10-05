@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import { sql } from '../lib/db';
 import { createSessionCookie, json, parseBody } from '../lib/auth';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -17,38 +16,36 @@ export const handler = async (event: any) => {
     const payload = parseBody(event);
     const email = String(payload.email ?? '').trim().toLowerCase();
     const password = String(payload.password ?? '');
+    const adminEmail = String(process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+    const adminPasswordHash = String(process.env.ADMIN_PASSWORD_HASH ?? '').trim();
 
-    if (!emailRegex.test(email) || password.length < 8) {
+    if (!adminEmail || !adminPasswordHash) {
+      return json(500, { error: 'Admin login is not configured' });
+    }
+
+    if (!emailRegex.test(email) || password.length === 0) {
       return json(401, { error: 'Invalid email or password' });
     }
 
-    const rows = await sql`
-      SELECT id, name, email, password_hash
-      FROM app_users
-      WHERE email = ${email}
-      LIMIT 1
-    `;
-
-    const user = rows[0];
-    if (!user) {
+    if (email !== adminEmail) {
       return json(401, { error: 'Invalid email or password' });
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+    const passwordMatches = await bcrypt.compare(password, adminPasswordHash);
     if (!passwordMatches) {
       return json(401, { error: 'Invalid email or password' });
     }
 
     const safeUser = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
+      id: 1,
+      name: 'Admin',
+      email: adminEmail,
     };
 
     return json(200, { user: safeUser }, { 'Set-Cookie': createSessionCookie(safeUser) });
   } catch (error: any) {
     return json(500, {
-      error: 'Login failed',
+      error: 'Admin login is not configured',
       details: error instanceof Error ? error.message : String(error),
     });
   }
