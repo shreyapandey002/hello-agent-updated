@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronDown, ChevronLeft } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, FileText, Paperclip } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { MessageItem, ThreadDetails } from '../../services/mailboxApi';
 
@@ -29,6 +29,12 @@ function formatDetailedMessageTime(value: string) {
 function stripHtml(value: string | null | undefined) {
   if (!value) return '';
   return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function formatAttachmentSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function parseMetadata(metadata: Record<string, any> | undefined) {
@@ -379,6 +385,47 @@ export function ThreadView({
                           {bodyText}
                         </div>
                       )}
+
+                      {message.metadata.attachments?.length ? (
+                        <div className="mt-4 space-y-2">
+                          <div className={`flex items-center gap-2 text-xs font-semibold ${soft}`}>
+                            <Paperclip className="h-3.5 w-3.5" />
+                            Attachments ({message.metadata.attachments.length})
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {message.metadata.attachments.map((attachment) => {
+                              const emailId = message.provider_email_id || message.metadata.email_id;
+                              const attachmentUrl = emailId
+                                ? `/api/attachment?${new URLSearchParams({
+                                    email_id: emailId,
+                                    attachment_id: attachment.id,
+                                  }).toString()}`
+                                : undefined;
+                              const fileType = attachment.content_type.split('/').pop()?.toUpperCase() || 'FILE';
+
+                              return (
+                                <a
+                                  key={attachment.id}
+                                  href={attachmentUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-disabled={!attachmentUrl}
+                                  onClick={!attachmentUrl ? (event) => event.preventDefault() : undefined}
+                                  className={`flex min-w-0 max-w-full items-center gap-3 rounded-xl border px-3 py-2 ${isDark ? 'border-slate-700 bg-slate-950/60 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'} ${!attachmentUrl ? 'cursor-not-allowed opacity-60' : ''}`}
+                                >
+                                  <FileText className={`h-5 w-5 shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-500'}`} />
+                                  <span className="min-w-0">
+                                    <span className={`block break-all text-xs font-medium ${strong}`}>{attachment.filename}</span>
+                                    <span className={`mt-0.5 block text-[10px] ${soft}`}>
+                                      {fileType} · {formatAttachmentSize(attachment.size)}
+                                    </span>
+                                  </span>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
