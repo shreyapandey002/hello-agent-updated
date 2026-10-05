@@ -31,6 +31,24 @@ function stripHtml(value: string | null | undefined) {
   return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function buildWordBoundedPreview(value: string | null | undefined) {
+  const compact = String(value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!compact) return '';
+
+  const maxLength = 220;
+  if (compact.length <= maxLength) return compact;
+
+  const truncated = compact.slice(0, maxLength).trimEnd();
+  const lastSpace = truncated.lastIndexOf(' ');
+  const safeSlice = lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, maxLength);
+
+  return `${safeSlice.trimEnd()}…`;
+}
+
 function parseMetadata(metadata: Record<string, any> | undefined) {
   if (!metadata || typeof metadata !== 'object') return null;
 
@@ -168,6 +186,24 @@ export function ThreadView({
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const orderedMessageIds = orderedMessages.map((message) => message.id).join(',');
 
+  const getCompactWebsiteSummary = (message: MessageItem) => {
+    const metadata = message.metadata || {};
+    const company = metadata.company_name || '';
+    const workflow = metadata.primary_email_workflow || metadata.use_case || '';
+    const volume = metadata.monthly_email_volume || '';
+    const date = metadata.consultation_date || '';
+    const time = metadata.consultation_time || '';
+
+    const values = [
+      company ? `Company: ${company}` : '',
+      workflow ? `Workflow: ${workflow}` : '',
+      volume ? `Volume: ${volume}` : '',
+      date || time ? `Slot: ${[date, time].filter(Boolean).join(' ')}` : '',
+    ].filter(Boolean);
+
+    return values.join(' · ');
+  };
+
   useEffect(() => {
     if (!orderedMessages.length) {
       setExpandedIds(new Set());
@@ -223,12 +259,12 @@ export function ThreadView({
       <div className={`min-w-0 shrink-0 border-b px-5 py-4 ${border}`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h2 className={`break-words [overflow-wrap:anywhere] text-[18px] font-semibold ${strong}`}>{orderedMessages[0]?.subject || thread.subject || 'No subject'}</h2>
+            <h2 className={`min-w-0 break-words text-[18px] font-semibold [overflow-wrap:anywhere] ${strong}`}>{orderedMessages[0]?.subject || thread.subject || 'No subject'}</h2>
             <div className={`mt-1 text-sm ${soft}`}>
               <span className="break-all">{thread.mailbox}</span> · {folder === 'all' ? `${orderedMessages.length} messages` : 'Individual email'}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button type="button" onClick={onBack} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium min-[768px]:hidden ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
               <ChevronLeft className="h-3.5 w-3.5" />
               Inbox
@@ -247,7 +283,7 @@ export function ThreadView({
         </div>
       </div>
 
-      <div className={`${isIndividualEmail ? 'mr-2 ' : ''}min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5`}>
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5">
         <div className="space-y-4">
           {orderedMessages.map((message, index) => {
             const isInbound = message.direction === 'inbound';
@@ -256,7 +292,9 @@ export function ThreadView({
             const senderName = isInbound ? (thread.contact_name || thread.contact_email || 'Customer') : 'Hello Agent';
             const senderEmail = message.from_addr || (isInbound ? thread.contact_email : 'ai@helloagent.email') || 'unknown@example.com';
             const bodyText = message.body_text || stripHtml(message.body_html) || 'No message content.';
-            const previewText = stripHtml(bodyText).slice(0, 120) + (stripHtml(bodyText).length > 120 ? '…' : '');
+            const strippedBodyText = stripHtml(bodyText);
+            const previewText = buildWordBoundedPreview(strippedBodyText);
+            const compactWebsiteSummary = isWebsiteForm ? getCompactWebsiteSummary(message) : '';
             const chips = getMessageChips(message, thread);
             const badgeTone = isInbound
               ? 'border-slate-200 bg-slate-100 text-slate-700'
@@ -295,14 +333,14 @@ export function ThreadView({
                         <div className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-semibold ${isInbound ? (isDark ? 'bg-[#d9f7ea] text-slate-800' : 'bg-emerald-100 text-emerald-900') : (isDark ? 'bg-slate-200 text-slate-900' : 'bg-slate-900 text-white')}`}>
                           {initials}
                         </div>
-                        <div className="min-w-0">
-                          <div className={`break-words [overflow-wrap:anywhere] text-sm font-semibold ${strong}`}>{senderName}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className={`break-words text-sm font-semibold [overflow-wrap:anywhere] ${strong}`}>{senderName}</div>
                           <div className={`break-all text-[11px] ${soft}`}>{senderEmail}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                             {chips.map((chip) => (
-                              <span key={`${message.id}-${chip.label}`} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${chip.label === 'Status' ? badgeTone : (isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700')}`}>
+                              <span key={`${message.id}-${chip.label}`} className={`inline-flex min-w-0 max-w-full flex-wrap items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${chip.label === 'Status' ? badgeTone : (isDark ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-100 text-slate-700')}`}>
                                 <span className="opacity-70">{chip.label}:</span>
-                                <span>{chip.value}</span>
+                                <span className="break-words [overflow-wrap:anywhere]">{chip.value}</span>
                               </span>
                             ))}
                           </div>
@@ -320,7 +358,15 @@ export function ThreadView({
 
                   {!isExpanded && !isIndividualEmail ? (
                     <div className={`border-t px-4 pb-3 pt-2 text-sm ${isDark ? 'border-slate-800 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
-                      {previewText}
+                      {isWebsiteForm ? (
+                        <p className="break-words leading-snug [overflow-wrap:anywhere]">
+                          {compactWebsiteSummary || previewText}
+                        </p>
+                      ) : (
+                        <p className="break-words leading-snug [overflow-wrap:anywhere]">
+                          {previewText}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className={`border-t px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
@@ -375,7 +421,7 @@ export function ThreadView({
                           </div>
                         </div>
                       ) : (
-                        <div className={`min-w-0 break-words [overflow-wrap:anywhere] leading-7 ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        <div className={`min-w-0 whitespace-pre-wrap break-words leading-7 [overflow-wrap:anywhere] ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                           {bodyText}
                         </div>
                       )}

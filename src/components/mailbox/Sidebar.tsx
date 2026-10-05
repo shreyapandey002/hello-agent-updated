@@ -53,7 +53,7 @@ export function Sidebar({
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }) {
-  const shell = isDark ? 'border-slate-800 bg-[#111827]' : 'border-slate-200 bg-[#f8f8f7]';
+  const shell = isDark ? 'bg-[#111827]' : 'bg-[#f8f8f7]';
   const rowBase = isDark ? 'hover:bg-slate-800/90' : 'hover:bg-slate-100';
   const selectedRow = isDark ? 'bg-slate-800 text-white' : 'bg-slate-200/90 text-slate-900';
   const subtleText = isDark ? 'text-slate-400' : 'text-slate-500';
@@ -111,12 +111,12 @@ export function Sidebar({
             }}
             className={`flex min-w-0 flex-1 items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${buttonTextClasses}`}
           >
-            <span className="flex min-w-0 items-center gap-2">
-              {icon === 'all' ? <Inbox className="h-4 w-4 shrink-0" /> : <Mail className="h-4 w-4 shrink-0" />}
-              <span className="truncate text-sm font-medium">{label}</span>
+            <span className="flex min-w-0 flex-1 items-start gap-2">
+              {icon === 'all' ? <Inbox className="mt-0.5 h-4 w-4 shrink-0" /> : <Mail className="mt-0.5 h-4 w-4 shrink-0" />}
+              <span className="min-w-0 flex-1 break-words text-sm font-medium [overflow-wrap:anywhere]">{label}</span>
             </span>
             {count > 0 ? (
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${chip}`}>{count}</span>
+              <span className={`ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${chip}`}>{count}</span>
             ) : null}
           </button>
 
@@ -168,7 +168,7 @@ export function Sidebar({
 
   if (isCollapsed) {
     return (
-      <aside className={`flex h-full min-w-0 flex-col border-r ${shell}`} style={{ width: 64 }}>
+      <aside className={`flex h-full min-w-0 flex-col ${shell}`} style={{ width: 64 }}>
         <div className={`flex shrink-0 items-center justify-center border-b px-2 py-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
           <button
             type="button"
@@ -251,7 +251,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className={`flex h-full min-w-0 flex-col border-r ${shell}`}>
+    <aside className={`flex h-full min-w-0 flex-col ${shell}`}>
       <div className={`flex shrink-0 items-center justify-between gap-3 border-b px-4 py-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex min-w-0 items-center gap-3">
           <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${isDark ? 'bg-slate-100 text-slate-900' : 'bg-[#111827] text-white'}`}>

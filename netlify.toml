@@ -34,11 +34,6 @@
   status = 200
 
 [[redirects]]
-  from = "/signup"
-  to = "/"
-  status = 200
-
-[[redirects]]
   from = "/mailbox"
   to = "/"
   status = 200

@@ -10,8 +10,7 @@ export type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>; 
-  signup: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>; 
+  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
 };
 
@@ -66,29 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        return { ok: false, error: data.error || 'Signup failed' };
-      }
-
-      setUser(data.user ?? null);
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Signup failed' };
-    }
-  };
-
   const logout = async () => {
     try {
       await fetch('/api/auth/logout', {
@@ -102,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<AuthContextType>(
-    () => ({ user, loading, login, signup, logout }),
+    () => ({ user, loading, login, logout }),
     [user, loading, navigate]
   );
 

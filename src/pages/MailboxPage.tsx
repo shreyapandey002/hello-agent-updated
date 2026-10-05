@@ -8,11 +8,21 @@ import { useTheme } from '../ThemeContext';
 import { getEmailMessage, getMailboxes, getThread, getThreads, type EmailListItem, type Mailbox, type MessageItem, type ThreadDetails, type ThreadItem } from '../services/mailboxApi';
 
 const DEFAULT_SIDEBAR_WIDTH = 280;
-const DEFAULT_LIST_WIDTH = 360;
-const SIDEBAR_MIN_WIDTH = 220;
-const SIDEBAR_MAX_WIDTH = 400;
+const DEFAULT_LIST_WIDTH = 440;
+const SIDEBAR_MIN_WIDTH = 200;
 const LIST_MIN_WIDTH = 320;
-const LIST_MAX_WIDTH = 640;
+const THREAD_MIN_WIDTH = 360;
+
+function clampSidebarWidth(value: number, viewportWidth: number) {
+  const maxSidebarPercentWidth = viewportWidth * 0.4;
+  const maxSidebarWidth = Math.max(SIDEBAR_MIN_WIDTH, maxSidebarPercentWidth);
+  return Math.min(Math.max(value, SIDEBAR_MIN_WIDTH), maxSidebarWidth);
+}
+
+function clampListWidth(value: number, viewportWidth: number, sidebarWidth: number) {
+  const maxListWidth = Math.max(LIST_MIN_WIDTH, viewportWidth - sidebarWidth - THREAD_MIN_WIDTH);
+  return Math.min(Math.max(value, LIST_MIN_WIDTH), maxListWidth);
+}
 
 function readLocalNumber(key: string, fallback: number) {
   try {
@@ -67,13 +77,56 @@ export default function MailboxPage() {
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => readLocalNumber('hello-agent-mailbox-sidebar-width', DEFAULT_SIDEBAR_WIDTH));
   const [listWidth, setListWidth] = useState<number>(() => readLocalNumber('hello-agent-mailbox-list-width', DEFAULT_LIST_WIDTH));
   const [isMobileLayout, setIsMobileLayout] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [draggingDivider, setDraggingDivider] = useState<string | null>(null);
+  const dragRef = useRef<{ divider: 'sidebar' | 'list'; startX: number; startWidth: number; pointerId: number } | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
   const threadRequestId = useRef(0);
 
   useEffect(() => {
-    const handleResize = () => setIsMobileLayout(window.innerWidth < 768);
+    const handleResize = () => {
+      setIsMobileLayout(window.innerWidth < 768);
+      setSidebarWidth((current) => clampSidebarWidth(current, window.innerWidth));
+      setListWidth((current) => clampListWidth(current, window.innerWidth, sidebarWidth));
+    };
+
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarWidth]);
+
+  const stopDrag = () => {
+    const cleanup = dragCleanupRef.current;
+    if (cleanup) {
+      cleanup();
+      dragCleanupRef.current = null;
+    }
+
+    dragRef.current = null;
+    setDraggingDivider(null);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  };
+
+  useEffect(() => {
+    if (!draggingDivider) {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      return;
+    }
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    return () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [draggingDivider]);
+
+  useEffect(() => {
+    return () => {
+      stopDrag();
+    };
   }, []);
 
   useEffect(() => {
@@ -280,52 +333,89 @@ export default function MailboxPage() {
       ? 'Sent emails'
       : 'All conversations';
 
-  const handleSidebarResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (isMobileLayout) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = sidebarWidth;
+  const beginDrag = (divider: 'sidebar' | 'list', startX: number, startWidth: number, pointerId: number) => {
+    dragRef.current = { divider, startX, startWidth, pointerId };
+    setDraggingDivider(divider);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
 
     const handlePointerMove = (pointerMoveEvent: PointerEvent) => {
-      const nextWidth = Math.min(Math.max(startWidth + (pointerMoveEvent.clientX - startX), SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
-      setSidebarWidth(nextWidth);
+      const dragState = dragRef.current;
+      if (!dragState || dragState.pointerId !== pointerMoveEvent.pointerId) {
+        return;
+      }
+
+      if (pointerMoveEvent.buttons === 0) {
+        stopDrag();
+        return;
+      }
+
+      if (dragState.divider === 'sidebar') {
+        const nextWidth = clampSidebarWidth(dragState.startWidth + (pointerMoveEvent.clientX - dragState.startX), window.innerWidth);
+        setSidebarWidth(nextWidth);
+        setListWidth((current) => clampListWidth(current, window.innerWidth, nextWidth));
+      } else {
+        const nextWidth = clampListWidth(dragState.startWidth + (pointerMoveEvent.clientX - dragState.startX), window.innerWidth, sidebarWidth);
+        setListWidth(nextWidth);
+      }
     };
 
-    const handlePointerUp = () => {
+    const handlePointerEnd = (pointerEndEvent: PointerEvent | KeyboardEvent | Event) => {
+      if ('pointerId' in pointerEndEvent && dragRef.current && pointerEndEvent.pointerId !== dragRef.current.pointerId) {
+        return;
+      }
+      stopDrag();
+    };
+
+    const cleanup = () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointerup', handlePointerEnd as EventListener);
+      window.removeEventListener('pointercancel', handlePointerEnd as EventListener);
+      window.removeEventListener('blur', handlePointerEnd as EventListener);
+      window.removeEventListener('keydown', handleEscapeKey as EventListener);
     };
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        stopDrag();
+      }
+    };
+
+    dragCleanupRef.current = cleanup;
     window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointerup', handlePointerEnd as EventListener);
+    window.addEventListener('pointercancel', handlePointerEnd as EventListener);
+    window.addEventListener('blur', handlePointerEnd as EventListener);
+    window.addEventListener('keydown', handleEscapeKey);
+  };
+
+  const handleSidebarResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isMobileLayout) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    beginDrag('sidebar', event.clientX, sidebarWidth, event.pointerId);
   };
 
   const handleListResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (isMobileLayout) return;
+    if (event.button !== 0 || isMobileLayout) return;
     event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = listWidth;
-
-    const handlePointerMove = (pointerMoveEvent: PointerEvent) => {
-      const nextWidth = Math.min(Math.max(startWidth + (pointerMoveEvent.clientX - startX), LIST_MIN_WIDTH), LIST_MAX_WIDTH);
-      setListWidth(nextWidth);
-    };
-
-    const handlePointerUp = () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    beginDrag('list', event.clientX, listWidth, event.pointerId);
   };
 
   const dividerClasses = isDark
     ? 'bg-transparent hover:bg-slate-500/20'
     : 'bg-transparent hover:bg-slate-300/70';
 
+  const dividerLineClass = isDark
+    ? 'bg-slate-700 group-hover:bg-sky-400 group-[.dragging]:bg-sky-400'
+    : 'bg-slate-300 group-hover:bg-sky-500 group-[.dragging]:bg-sky-500';
+
   return (
     <div className={isDark ? 'flex h-[100dvh] overflow-hidden bg-[#111827] text-slate-100' : 'flex h-[100dvh] overflow-hidden bg-[#f5f5f4] text-slate-900'}>
+      {draggingDivider ? (
+        <div className="fixed inset-0 z-50" style={{ cursor: 'col-resize' }} />
+      ) : null}
       {mailboxError ? (
         <div className={isDark ? 'flex min-h-screen items-center justify-center bg-[#111827] p-6' : 'flex min-h-screen items-center justify-center bg-[#f5f5f4] p-6'}>
           <div className={isDark ? 'max-w-md rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-center text-red-200' : 'max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-700'}>
@@ -359,16 +449,20 @@ export default function MailboxPage() {
             />
             {!isMobileLayout ? (
               <div
-                className={`absolute right-0 top-0 h-full w-2 cursor-col-resize transition-all ${dividerClasses}`}
+                className={`group absolute right-0 top-0 flex h-full w-8 cursor-col-resize items-center justify-center transition-all ${draggingDivider === 'sidebar' ? 'dragging' : ''} ${dividerClasses}`}
                 onPointerDown={handleSidebarResizePointerDown}
                 onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
                 title="Resize sidebar"
-              />
+                style={{ touchAction: 'none' }}
+                onLostPointerCapture={() => stopDrag()}
+              >
+                <div className={`h-full w-px transition-all ${dividerLineClass} ${draggingDivider === 'sidebar' ? 'w-[2px]' : ''}`} />
+              </div>
             ) : null}
           </div>
 
           <div
-            className={`relative flex h-full min-h-0 shrink-0 overflow-hidden ${selectedThreadId && isMobileLayout ? 'hidden' : ''}`}
+            className={`relative flex h-full min-h-0 shrink-0 overflow-x-hidden ${selectedThreadId && isMobileLayout ? 'hidden' : ''}`}
             style={{ width: listWidth, minWidth: 0 }}
           >
             <ThreadList
@@ -391,11 +485,15 @@ export default function MailboxPage() {
             />
             {!isMobileLayout ? (
               <div
-                className={`absolute right-0 top-0 h-full w-2 cursor-col-resize transition-all ${dividerClasses}`}
+                className={`group absolute right-0 top-0 flex h-full w-8 cursor-col-resize items-center justify-center transition-all ${draggingDivider === 'list' ? 'dragging' : ''} ${dividerClasses}`}
                 onPointerDown={handleListResizePointerDown}
                 onDoubleClick={() => setListWidth(DEFAULT_LIST_WIDTH)}
                 title="Resize conversation list"
-              />
+                style={{ touchAction: 'none' }}
+                onLostPointerCapture={() => stopDrag()}
+              >
+                <div className={`h-full w-px transition-all ${dividerLineClass} ${draggingDivider === 'list' ? 'w-[2px]' : ''}`} />
+              </div>
             ) : null}
           </div>
 

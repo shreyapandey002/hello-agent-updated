@@ -1,6 +1,6 @@
 import { Moon, SunMedium } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md">
             <span className="font-display text-2xl font-bold">H</span>
           </div>
-          <h1 className="mt-4 font-display text-3xl font-bold">Hello<span className="text-blue-600">Agent</span></h1>
+          <h1 className="mt-4 font-display text-2xl font-bold">Hello Agent Admin Login</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -105,12 +105,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 text-center text-sm text-slate-500">
-          Need an account?{' '}
-          <Link to="/signup" className="font-semibold text-blue-600 hover:text-blue-500">
-            Create one
-          </Link>
-        </div>
       </div>
     </div>
   );

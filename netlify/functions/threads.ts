@@ -1,6 +1,24 @@
 import { getSessionUser, json } from '../lib/auth';
 import { sql } from '../lib/db';
 
+function buildWordBoundedPreview(value: string | null | undefined) {
+  const compact = String(value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!compact) return '';
+
+  const maxLength = 220;
+  if (compact.length <= maxLength) return compact;
+
+  const truncated = compact.slice(0, maxLength).trimEnd();
+  const lastSpace = truncated.lastIndexOf(' ');
+  const safeSlice = lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, maxLength);
+
+  return `${safeSlice.trimEnd()}…`;
+}
+
 export const handler = async (event: any) => {
   if (event.httpMethod === 'OPTIONS') {
     return json(204, {});
@@ -67,8 +85,7 @@ export const handler = async (event: any) => {
           mt.contact_email,
           mt.contact_name,
           mt.unread AS thread_unread,
-          mb.address AS mailbox,
-          COALESCE(substring(COALESCE(mm.body_text, mm.body_html) FROM 1 FOR 160), '') AS preview
+          mb.address AS mailbox
         FROM mail_messages mm
         JOIN mail_threads mt ON mt.id = mm.thread_id
         JOIN mailboxes mb ON mb.id = mt.mailbox_id
@@ -95,7 +112,7 @@ export const handler = async (event: any) => {
           contact_name: row.contact_name,
           thread_unread: Boolean(row.thread_unread),
           mailbox: row.mailbox,
-          preview: row.preview || '',
+          preview: buildWordBoundedPreview(row.body_text || row.body_html),
         })),
       });
     }
@@ -155,7 +172,7 @@ export const handler = async (event: any) => {
         lm.last_direction,
         lm.last_status,
         lm.last_agent,
-        COALESCE(substring(lm.last_body_text FROM 1 FOR 160), '') AS preview
+        lm.last_body_text
       FROM mail_threads mt
       JOIN mailboxes mb ON mb.id = mt.mailbox_id
       LEFT JOIN (
@@ -182,7 +199,7 @@ export const handler = async (event: any) => {
         last_direction: row.last_direction,
         last_status: row.last_status,
         last_agent: row.last_agent,
-        preview: row.preview || '',
+        preview: buildWordBoundedPreview(row.last_body_text),
       })),
     });
   } catch (error: any) {
