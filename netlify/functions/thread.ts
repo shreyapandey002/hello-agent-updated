@@ -42,6 +42,7 @@ export const handler = async (event: any) => {
           mm.body_html,
           mm.agent_name,
           mm.status,
+          mm.provider_email_id,
           mm.metadata,
           mm.created_at
         FROM mail_messages mm
@@ -78,6 +79,7 @@ export const handler = async (event: any) => {
           body_html: row.body_html,
           agent_name: row.agent_name,
           status: row.status,
+          provider_email_id: row.provider_email_id,
           metadata: row.metadata ?? {},
           created_at: row.created_at,
         },
@@ -122,6 +124,7 @@ export const handler = async (event: any) => {
         body_html,
         agent_name,
         status,
+        provider_email_id,
         metadata,
         created_at
       FROM mail_messages
@@ -151,6 +154,7 @@ export const handler = async (event: any) => {
         body_html: message.body_html,
         agent_name: message.agent_name,
         status: message.status,
+        provider_email_id: message.provider_email_id,
         metadata: message.metadata ?? {},
         created_at: message.created_at,
       })),

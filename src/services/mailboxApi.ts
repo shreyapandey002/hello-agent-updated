@@ -34,8 +34,19 @@ export type MessageItem = {
   body_html: string | null;
   agent_name: string | null;
   status: string | null;
-  metadata: Record<string, any>;
+  provider_email_id?: string | null;
+  metadata: Record<string, any> & {
+    email_id?: string;
+    attachments?: EmailAttachment[];
+  };
   created_at: string;
+};
+
+export type EmailAttachment = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
 };
 
 export type EmailListItem = MessageItem & {
