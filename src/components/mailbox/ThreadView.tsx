@@ -289,8 +289,8 @@ export function ThreadView({
         </div>
       </div>
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5">
-        <div className="space-y-4">
+      <div className={`${isIndividualEmail ? 'min-h-0 min-w-0 flex-1 overflow-hidden p-5' : 'mr-2 min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-5'}`}>
+        <div className={isIndividualEmail ? 'flex h-full min-h-0 min-w-0 flex-col' : 'space-y-4'}>
           {orderedMessages.map((message, index) => {
             const isInbound = message.direction === 'inbound';
             const isExpanded = expandedIds.has(message.id);
@@ -310,7 +310,7 @@ export function ThreadView({
             const initials = (senderName || 'A').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
 
             return (
-              <div key={message.id} className={isIndividualEmail ? 'min-w-0' : 'relative pl-7'}>
+              <div key={message.id} className={isIndividualEmail ? 'flex min-h-0 min-w-0 flex-1 flex-col' : 'relative min-w-0 pl-7'}>
                 {!isIndividualEmail && index < orderedMessages.length - 1 ? (
                   <div className={`absolute left-[15px] top-0 h-full w-px ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
                 ) : null}
@@ -318,7 +318,7 @@ export function ThreadView({
                   <div className={`absolute left-0 top-3 h-4 w-4 rounded-full border-2 ${isDark ? 'border-slate-900 bg-sky-500' : 'border-white bg-sky-600'}`} />
                 ) : null}
 
-                <div className={`min-w-0 rounded-2xl border ${card}`}>
+                <div className={`${isIndividualEmail ? 'flex min-h-0 min-w-0 flex-1 flex-col ' : 'min-w-0 '}overflow-hidden rounded-2xl border ${card}`}>
                   <button
                     type="button"
                     disabled={isIndividualEmail}
@@ -332,7 +332,7 @@ export function ThreadView({
                       return next;
                     })}
                     aria-expanded={isExpanded}
-                    className="w-full text-left"
+                    className="w-full shrink-0 text-left"
                   >
                     <div className="flex min-w-0 items-start justify-between gap-3 px-4 py-3">
                       <div className="flex min-w-0 items-start gap-3">
@@ -375,8 +375,8 @@ export function ThreadView({
                       )}
                     </div>
                   ) : (
-                    <div className={`border-t px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                      <div className={`mb-4 rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className={`${isIndividualEmail ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ' : ''}border-t px-4 py-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <div className={`mb-4 shrink-0 rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
                         <div className={`mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] ${soft}`}>
                           Message details
                         </div>
@@ -412,66 +412,70 @@ export function ThreadView({
                         </div>
                       </div>
 
-                      {isWebsiteForm ? (
-                        <div className={`rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
-                          <div className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] ${soft}`}>
-                            Website form details
-                          </div>
-                          <div className="space-y-2 text-sm">
-                            {getWebsiteFormRows(message, thread).map((row) => (
-                              <div key={`${message.id}-${row.label}`} className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-[minmax(7rem,0.4fr)_minmax(0,1fr)] sm:gap-3">
-                                <div className={`min-w-0 break-words text-xs font-medium ${soft}`}>{row.label}:</div>
-                                <div className={`min-w-0 break-words [overflow-wrap:anywhere] text-xs ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: row.preserveWrap ? 'pre-wrap' : 'normal' }}>{row.value}</div>
+                      <div className={`${isIndividualEmail ? '-ml-4 -mr-2 -mb-4 min-h-0 flex-1 overflow-y-auto overscroll-y-contain' : ''} min-w-0 overflow-x-hidden`}>
+                        <div className="min-w-0 px-4 pb-4">
+                          {isWebsiteForm ? (
+                            <div className={`rounded-xl border p-3 ${isDark ? 'border-slate-700 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
+                              <div className={`mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] ${soft}`}>
+                                Website form details
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className={`min-w-0 whitespace-pre-wrap break-words leading-7 [overflow-wrap:anywhere] ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                          {bodyText}
-                        </div>
-                      )}
+                              <div className="space-y-2 text-sm">
+                                {getWebsiteFormRows(message, thread).map((row) => (
+                                  <div key={`${message.id}-${row.label}`} className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-[minmax(7rem,0.4fr)_minmax(0,1fr)] sm:gap-3">
+                                    <div className={`min-w-0 break-words text-xs font-medium ${soft}`}>{row.label}:</div>
+                                    <div className={`min-w-0 break-words [overflow-wrap:anywhere] text-xs ${isDark ? 'text-slate-200' : 'text-slate-700'}`} style={{ whiteSpace: row.preserveWrap ? 'pre-wrap' : 'normal' }}>{row.value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className={`min-w-0 whitespace-pre-wrap break-words leading-7 [overflow-wrap:anywhere] ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                              {bodyText}
+                            </div>
+                          )}
 
-                      {message.metadata.attachments?.length ? (
-                        <div className="mt-4 space-y-2">
-                          <div className={`flex items-center gap-2 text-xs font-semibold ${soft}`}>
-                            <Paperclip className="h-3.5 w-3.5" />
-                            Attachments ({message.metadata.attachments.length})
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {message.metadata.attachments.map((attachment) => {
-                              const emailId = message.provider_email_id || message.metadata.email_id;
-                              const attachmentUrl = emailId
-                                ? `/api/attachment?${new URLSearchParams({
-                                    email_id: emailId,
-                                    attachment_id: attachment.id,
-                                  }).toString()}`
-                                : undefined;
-                              const fileType = attachment.content_type.split('/').pop()?.toUpperCase() || 'FILE';
+                          {message.metadata.attachments?.length ? (
+                            <div className="mt-4 space-y-2">
+                              <div className={`flex items-center gap-2 text-xs font-semibold ${soft}`}>
+                                <Paperclip className="h-3.5 w-3.5" />
+                                Attachments ({message.metadata.attachments.length})
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {message.metadata.attachments.map((attachment) => {
+                                  const emailId = message.provider_email_id || message.metadata.email_id;
+                                  const attachmentUrl = emailId
+                                    ? `/api/attachment?${new URLSearchParams({
+                                        email_id: emailId,
+                                        attachment_id: attachment.id,
+                                      }).toString()}`
+                                    : undefined;
+                                  const fileType = attachment.content_type.split('/').pop()?.toUpperCase() || 'FILE';
 
-                              return (
-                                <a
-                                  key={attachment.id}
-                                  href={attachmentUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  aria-disabled={!attachmentUrl}
-                                  onClick={!attachmentUrl ? (event) => event.preventDefault() : undefined}
-                                  className={`flex min-w-0 max-w-full items-center gap-3 rounded-xl border px-3 py-2 ${isDark ? 'border-slate-700 bg-slate-950/60 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'} ${!attachmentUrl ? 'cursor-not-allowed opacity-60' : ''}`}
-                                >
-                                  <FileText className={`h-5 w-5 shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-500'}`} />
-                                  <span className="min-w-0">
-                                    <span className={`block break-all text-xs font-medium ${strong}`}>{attachment.filename}</span>
-                                    <span className={`mt-0.5 block text-[10px] ${soft}`}>
-                                      {fileType} · {formatAttachmentSize(attachment.size)}
-                                    </span>
-                                  </span>
-                                </a>
-                              );
-                            })}
-                          </div>
+                                  return (
+                                    <a
+                                      key={attachment.id}
+                                      href={attachmentUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      aria-disabled={!attachmentUrl}
+                                      onClick={!attachmentUrl ? (event) => event.preventDefault() : undefined}
+                                      className={`flex min-w-0 max-w-full items-center gap-3 rounded-xl border px-3 py-2 ${isDark ? 'border-slate-700 bg-slate-950/60 hover:bg-slate-800' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'} ${!attachmentUrl ? 'cursor-not-allowed opacity-60' : ''}`}
+                                    >
+                                      <FileText className={`h-5 w-5 shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-500'}`} />
+                                      <span className="min-w-0">
+                                        <span className={`block break-all text-xs font-medium ${strong}`}>{attachment.filename}</span>
+                                        <span className={`mt-0.5 block text-[10px] ${soft}`}>
+                                          {fileType} · {formatAttachmentSize(attachment.size)}
+                                        </span>
+                                      </span>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                      ) : null}
+                      </div>
                     </div>
                   )}
                 </div>
