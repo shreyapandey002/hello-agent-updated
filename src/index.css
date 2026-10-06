@@ -21,3 +21,133 @@
 .time-wheel-scroll::-webkit-scrollbar {
   display: none;
 }
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.thin-scrollbar:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track,
+.thin-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+}
+
+.thin-scrollbar::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.mailbox-list-container {
+  container-name: mailbox-list;
+  container-type: inline-size;
+}
+
+.mailbox-toolbar {
+  container-name: mailbox-toolbar;
+  container-type: inline-size;
+}
+
+.mailbox-filter-label-short {
+  display: none;
+}
+
+.mailbox-filter-option {
+  white-space: nowrap;
+}
+
+@container mailbox-toolbar (max-width: 390px) {
+  .mailbox-filter-label-full {
+    display: none;
+  }
+
+  .mailbox-filter-label-short {
+    display: inline;
+  }
+
+  .mailbox-filter-option {
+    padding-inline: 0.35rem;
+    font-size: 10px;
+  }
+}
+
+.mailbox-row-content {
+  display: grid;
+  grid-template-columns: 10px 18px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 3px;
+}
+
+.mailbox-unread-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.mailbox-unread-dot.is-unread {
+  background: #2563eb;
+}
+
+.mailbox-direction {
+  display: flex;
+  align-items: center;
+}
+
+.mailbox-sender,
+.mailbox-subject-preview,
+.mailbox-row-chips,
+.mailbox-time {
+  display: none;
+}
+
+.mailbox-stacked-content {
+  grid-column: 3 / -1;
+  display: block;
+}
+
+.mailbox-details-panel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mailbox-details-panel::-webkit-scrollbar {
+  display: none;
+}
+
+@container mailbox-list (min-width: 680px) {
+  .mailbox-row-content {
+    grid-template-columns: 10px 18px 220px minmax(80px, 1fr) minmax(72px, auto) auto;
+    column-gap: 8px;
+  }
+
+  .mailbox-sender,
+  .mailbox-subject-preview,
+  .mailbox-row-chips,
+  .mailbox-time {
+    display: flex;
+  }
+
+  .mailbox-stacked-content {
+    display: none;
+  }
+}

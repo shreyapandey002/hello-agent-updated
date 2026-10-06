@@ -1,4 +1,4 @@
-import { ChevronDown, Inbox, Mail, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sparkles, SunMedium } from 'lucide-react';
+import { ChevronDown, Inbox, Mail, PanelLeftClose, PanelLeftOpen, Settings, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from '../../context/AuthContext';
 import type { Mailbox as MailboxType } from '../../services/mailboxApi';
@@ -33,7 +33,6 @@ export function Sidebar({
   onSelectFolder,
   selectedFolder,
   allInboxCounts,
-  onToggleTheme,
   onLogout,
   isDark,
   isCollapsed,
@@ -47,7 +46,6 @@ export function Sidebar({
   onSelectFolder: (folder: 'all' | 'incoming' | 'sent', mailbox: string) => void;
   selectedFolder: 'all' | 'incoming' | 'sent';
   allInboxCounts: { incoming_count: number; sent_count: number; total_count: number };
-  onToggleTheme: () => void;
   onLogout: () => void;
   isDark: boolean;
   isCollapsed: boolean;
@@ -59,12 +57,6 @@ export function Sidebar({
   const subtleText = isDark ? 'text-slate-400' : 'text-slate-500';
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600';
   const chip = isDark ? 'bg-slate-700 text-slate-100' : 'bg-slate-200 text-slate-700';
-  const folderItems = [
-    { key: 'all', label: 'All conversations', count: allInboxCounts.total_count },
-    { key: 'incoming', label: 'Incoming emails', count: allInboxCounts.incoming_count },
-    { key: 'sent', label: 'Sent emails', count: allInboxCounts.sent_count },
-  ] as const;
-
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readStoredExpandedGroups(selectedMailbox, mailboxes));
 
   useEffect(() => {
@@ -91,7 +83,19 @@ export function Sidebar({
     });
   };
 
-  const renderGroupHeader = (groupKey: string, label: string, count: number, icon: 'all' | 'mailbox', mailboxAddress?: string) => {
+  const renderGroupHeader = (
+    groupKey: string,
+    label: string,
+    count: number,
+    icon: 'all' | 'mailbox',
+    mailboxAddress?: string,
+    counts = allInboxCounts,
+  ) => {
+    const folderItems = [
+      { key: 'all', label: 'All conversations', count: counts.total_count },
+      { key: 'incoming', label: 'Incoming emails', count: counts.incoming_count },
+      { key: 'sent', label: 'Sent emails', count: counts.sent_count },
+    ] as const;
     const isSelected = groupKey === 'all' ? selectedMailbox === 'all' : selectedMailbox === mailboxAddress;
     const isExpanded = Boolean(expandedGroups[groupKey]);
     const buttonTextClasses = isSelected ? selectedRow : `${rowBase} ${mutedText}`;
@@ -181,7 +185,7 @@ export function Sidebar({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-2">
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
@@ -228,15 +232,6 @@ export function Sidebar({
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              onClick={onToggleTheme}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-            >
-              {isDark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            <button
-              type="button"
               aria-label="Logout"
               title="Logout"
               onClick={onLogout}
@@ -271,7 +266,7 @@ export function Sidebar({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {renderGroupHeader('all', 'All inboxes', unreadTotal, 'all')}
         <div className={`mb-2 mt-4 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] ${subtleText}`}>Inboxes</div>
         <div className="space-y-2">
@@ -281,6 +276,11 @@ export function Sidebar({
             mailbox.unread_count,
             'mailbox',
             mailbox.address,
+            {
+              incoming_count: mailbox.incoming_count,
+              sent_count: mailbox.sent_count,
+              total_count: mailbox.thread_count,
+            },
           ))}
         </div>
       </div>
@@ -294,15 +294,6 @@ export function Sidebar({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              onClick={onToggleTheme}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-            >
-              {isDark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
             <button
               type="button"
               aria-label="Logout"

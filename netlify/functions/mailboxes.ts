@@ -19,25 +19,25 @@ export const handler = async (event: any) => {
   try {
     const rows = await sql`
       SELECT
-        m.id,
-        m.address,
-        m.display_name,
-        COALESCE((SELECT COUNT(*) FROM mail_threads mt WHERE mt.mailbox_id = m.id AND mt.unread = true), 0) AS unread_count,
-        COALESCE((SELECT COUNT(*) FROM mail_threads mt WHERE mt.mailbox_id = m.id), 0) AS thread_count,
+        mb.id,
+        mb.address,
+        mb.display_name,
+        COALESCE((SELECT COUNT(DISTINCT t.id) FROM mail_threads t WHERE t.mailbox_id = mb.id AND t.unread = true), 0) AS unread_count,
+        COALESCE((SELECT COUNT(DISTINCT t.id) FROM mail_threads t WHERE t.mailbox_id = mb.id), 0) AS thread_count,
         COALESCE((
-          SELECT COUNT(*)
-          FROM mail_messages mm
-          JOIN mail_threads mt ON mt.id = mm.thread_id
-          WHERE mt.mailbox_id = m.id AND mm.direction = 'inbound'
+          SELECT COUNT(msg.id)
+          FROM mail_messages msg
+          JOIN mail_threads t ON t.id = msg.thread_id
+          WHERE t.mailbox_id = mb.id AND msg.direction = 'inbound'
         ), 0) AS incoming_count,
         COALESCE((
-          SELECT COUNT(*)
-          FROM mail_messages mm
-          JOIN mail_threads mt ON mt.id = mm.thread_id
-          WHERE mt.mailbox_id = m.id AND mm.direction = 'outbound'
+          SELECT COUNT(msg.id)
+          FROM mail_messages msg
+          JOIN mail_threads t ON t.id = msg.thread_id
+          WHERE t.mailbox_id = mb.id AND msg.direction = 'outbound'
         ), 0) AS sent_count
-      FROM mailboxes m
-      ORDER BY m.address ASC
+      FROM mailboxes mb
+      ORDER BY mb.address ASC
     `;
 
     const mailboxes = rows.map((row: any) => ({
