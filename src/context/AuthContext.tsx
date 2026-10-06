@@ -15,6 +15,29 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+let pendingCurrentUserRequest: Promise<User | null> | null = null;
+
+function getCurrentUser() {
+  if (pendingCurrentUserRequest) return pendingCurrentUserRequest;
+
+  const request: Promise<User | null> = (async () => {
+    const response = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.user ?? null;
+  })();
+
+  pendingCurrentUserRequest = request;
+  void request.then(
+    () => {
+      if (pendingCurrentUserRequest === request) pendingCurrentUserRequest = null;
+    },
+    () => {
+      if (pendingCurrentUserRequest === request) pendingCurrentUserRequest = null;
+    },
+  );
+  return request;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -23,14 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchCurrentUser = async () => {
     try {
-      const response = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!response.ok) {
-        setUser(null);
-        return;
-      }
-
-      const data = await response.json();
-      setUser(data.user ?? null);
+      setUser(await getCurrentUser());
     } catch {
       setUser(null);
     } finally {

@@ -68,7 +68,26 @@ export type ThreadDetails = {
   unread: boolean;
 };
 
+const pendingGetRequests = new Map<string, Promise<unknown>>();
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  if ((init?.method || 'GET').toUpperCase() === 'GET') {
+    const pendingRequest = pendingGetRequests.get(url);
+    if (pendingRequest) return pendingRequest as Promise<T>;
+
+    const request = fetchJsonResponse<T>(url, init);
+    pendingGetRequests.set(url, request);
+    try {
+      return await request;
+    } finally {
+      if (pendingGetRequests.get(url) === request) pendingGetRequests.delete(url);
+    }
+  }
+
+  return fetchJsonResponse<T>(url, init);
+}
+
+async function fetchJsonResponse<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: 'include',
     ...init,

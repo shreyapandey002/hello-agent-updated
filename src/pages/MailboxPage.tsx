@@ -81,6 +81,8 @@ export default function MailboxPage() {
   const dragRef = useRef<{ divider: 'sidebar' | 'list'; startX: number; startWidth: number; pointerId: number } | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const threadRequestId = useRef(0);
+  const threadsRef = useRef(threads);
+  threadsRef.current = threads;
 
   useEffect(() => {
     const handleResize = () => {
@@ -185,10 +187,10 @@ export default function MailboxPage() {
 
   useEffect(() => {
     let latestRequest = 0;
-    const loadThreads = async () => {
+    const loadThreads = async (showLoading: boolean) => {
       const requestId = ++latestRequest;
       try {
-        setListLoading(true);
+        if (showLoading) setListLoading(true);
         const data = await getThreads({
           mailbox: mailboxQuery,
           q: searchTerm,
@@ -206,8 +208,8 @@ export default function MailboxPage() {
     };
 
     let active = true;
-    const timer = window.setTimeout(loadThreads, 300);
-    const refreshId = window.setInterval(loadThreads, 30000);
+    const timer = window.setTimeout(() => loadThreads(true), 300);
+    const refreshId = window.setInterval(() => loadThreads(false), 30000);
 
     return () => {
       active = false;
@@ -243,17 +245,28 @@ export default function MailboxPage() {
           setSelectedThread(data.thread);
           setSelectedThreadMessages([data.message]);
         }
-        void getMailboxes()
-          .then((mailboxData) => {
-            if (active && requestId === threadRequestId.current && threadSelectionKeyRef.current === selectionKey) {
-              setMailboxes(mailboxData.mailboxes);
-            }
-          })
-          .catch((refreshError) => {
-            if (active && requestId === threadRequestId.current && threadSelectionKeyRef.current === selectionKey) {
-              setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes');
-            }
-          });
+        const selectedListItem = threadsRef.current.find((item) => item.id === selectedThreadId);
+        const refreshMailboxCounts = !selectedListItem
+          || ('thread_unread' in selectedListItem ? selectedListItem.thread_unread : selectedListItem.unread);
+        if (selectedListItem) {
+          setThreads((current) => current.map((item) => {
+            if (item.id !== selectedThreadId) return item;
+            return 'thread_unread' in item ? { ...item, thread_unread: false } : { ...item, unread: false };
+          }));
+        }
+        if (refreshMailboxCounts) {
+          void getMailboxes()
+            .then((mailboxData) => {
+              if (active && requestId === threadRequestId.current && threadSelectionKeyRef.current === selectionKey) {
+                setMailboxes(mailboxData.mailboxes);
+              }
+            })
+            .catch((refreshError) => {
+              if (active && requestId === threadRequestId.current && threadSelectionKeyRef.current === selectionKey) {
+                setMailboxError(refreshError instanceof Error ? refreshError.message : 'Unable to load mailboxes');
+              }
+            });
+        }
       } catch (error) {
         if (active && requestId === threadRequestId.current && threadSelectionKeyRef.current === selectionKey) {
           setThreadError(error instanceof Error ? error.message : 'Unable to load thread');
@@ -332,6 +345,8 @@ export default function MailboxPage() {
     : folder === 'sent'
       ? 'Sent emails'
       : 'All conversations';
+  const mobileListLayout = isMobileLayout && !selectedThreadId;
+  const sidebarPaneWidth = sidebarCollapsed ? 64 : sidebarWidth;
 
   const beginDrag = (divider: 'sidebar' | 'list', startX: number, startWidth: number, pointerId: number) => {
     dragRef.current = { divider, startX, startWidth, pointerId };
@@ -427,10 +442,13 @@ export default function MailboxPage() {
           </div>
         </div>
       ) : (
-        <div className="flex h-full min-h-0 w-full overflow-hidden border-t border-slate-200/80">
+        <div className="flex h-full min-h-0 min-w-0 w-full overflow-hidden border-t border-slate-200/80">
           <div
             className={`relative flex h-full min-h-0 shrink-0 overflow-hidden ${selectedThreadId && isMobileLayout ? 'hidden' : ''}`}
-            style={{ width: sidebarCollapsed ? 64 : sidebarWidth, minWidth: sidebarCollapsed ? 64 : undefined }}
+            style={{
+              width: mobileListLayout ? `min(${sidebarPaneWidth}px, max(160px, 40vw))` : sidebarPaneWidth,
+              minWidth: mobileListLayout ? 0 : sidebarCollapsed ? 64 : undefined,
+            }}
           >
             <Sidebar
               mailboxes={mailboxes}
@@ -462,8 +480,8 @@ export default function MailboxPage() {
           </div>
 
           <div
-            className={`relative flex h-full min-h-0 shrink-0 overflow-x-hidden ${selectedThreadId && isMobileLayout ? 'hidden' : ''}`}
-            style={{ width: listWidth, minWidth: 0 }}
+            className={`relative flex h-full min-h-0 min-w-0 overflow-x-hidden ${mobileListLayout ? 'flex-1' : 'shrink-0'} ${selectedThreadId && isMobileLayout ? 'hidden' : ''}`}
+            style={mobileListLayout ? undefined : { width: listWidth, minWidth: 0 }}
           >
             <ThreadList
               threads={threads}
@@ -485,7 +503,7 @@ export default function MailboxPage() {
             />
             {!isMobileLayout ? (
               <div
-                className={`group absolute right-0 top-0 flex h-full w-8 cursor-col-resize items-center justify-center transition-all ${draggingDivider === 'list' ? 'dragging' : ''} ${dividerClasses}`}
+                className={`group absolute right-0 top-0 flex h-full w-8 cursor-col-resize items-center justify-end transition-all ${draggingDivider === 'list' ? 'dragging' : ''} ${dividerClasses}`}
                 onPointerDown={handleListResizePointerDown}
                 onDoubleClick={() => setListWidth(DEFAULT_LIST_WIDTH)}
                 title="Resize conversation list"
