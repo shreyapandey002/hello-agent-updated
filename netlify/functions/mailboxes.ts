@@ -25,6 +25,15 @@ export const handler = async (event: any) => {
         COALESCE((SELECT COUNT(DISTINCT t.id) FROM mail_threads t WHERE t.mailbox_id = mb.id AND t.unread = true), 0) AS unread_count,
         COALESCE((SELECT COUNT(DISTINCT t.id) FROM mail_threads t WHERE t.mailbox_id = mb.id), 0) AS thread_count,
         COALESCE((
+          SELECT COUNT(DISTINCT t.id)
+          FROM mail_threads t
+          WHERE t.mailbox_id = mb.id
+            AND EXISTS (
+              SELECT 1 FROM mail_messages msg
+              WHERE msg.thread_id = t.id AND msg.status = 'failed'
+            )
+        ), 0) AS needs_attention_count,
+        COALESCE((
           SELECT COUNT(msg.id)
           FROM mail_messages msg
           JOIN mail_threads t ON t.id = msg.thread_id
@@ -48,6 +57,7 @@ export const handler = async (event: any) => {
       incoming_count: Number(row.incoming_count),
       sent_count: Number(row.sent_count),
       thread_count: Number(row.thread_count),
+      needs_attention_count: Number(row.needs_attention_count),
     }));
 
     const allIncoming = mailboxes.reduce((sum, mailbox) => sum + mailbox.incoming_count, 0);
@@ -58,6 +68,7 @@ export const handler = async (event: any) => {
         incoming_count: allIncoming,
         sent_count: allSent,
         total_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.thread_count, 0),
+        needs_attention_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.needs_attention_count, 0),
       },
       mailboxes,
     });

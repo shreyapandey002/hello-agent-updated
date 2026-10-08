@@ -33,6 +33,28 @@ export const handler = async (event: any) => {
           mt.last_message_at,
           mt.unread,
           mb.address AS mailbox,
+          mb.address AS received_at,
+          (
+            SELECT routed_message.agent_name
+            FROM mail_messages routed_message
+            WHERE routed_message.thread_id = mt.id
+              AND routed_message.agent_name IS NOT NULL
+            ORDER BY routed_message.created_at DESC NULLS LAST, routed_message.id DESC
+            LIMIT 1
+          ) AS handled_by,
+          (
+            SELECT inbound_message.metadata->>'route_reason'
+            FROM mail_messages inbound_message
+            WHERE inbound_message.thread_id = mt.id
+              AND inbound_message.direction = 'inbound'
+            ORDER BY inbound_message.created_at DESC NULLS LAST, inbound_message.id DESC
+            LIMIT 1
+          ) AS route_reason,
+          EXISTS (
+            SELECT 1
+            FROM mail_messages failed_message
+            WHERE failed_message.thread_id = mt.id AND failed_message.status = 'failed'
+          ) AS needs_attention,
           mm.id,
           mm.direction,
           mm.from_addr,
@@ -65,6 +87,10 @@ export const handler = async (event: any) => {
           contact_email: row.contact_email,
           contact_name: row.contact_name,
           mailbox: row.mailbox,
+          received_at: row.received_at,
+          handled_by: row.handled_by,
+          route_reason: row.route_reason,
+          needs_attention: Boolean(row.needs_attention),
           last_message_at: row.last_message_at,
           unread: false,
         },
@@ -101,7 +127,29 @@ export const handler = async (event: any) => {
         mt.contact_name,
         mt.last_message_at,
         mt.unread,
-        mb.address AS mailbox
+        mb.address AS mailbox,
+        mb.address AS received_at,
+        (
+          SELECT routed_message.agent_name
+          FROM mail_messages routed_message
+          WHERE routed_message.thread_id = mt.id
+            AND routed_message.agent_name IS NOT NULL
+          ORDER BY routed_message.created_at DESC NULLS LAST, routed_message.id DESC
+          LIMIT 1
+        ) AS handled_by,
+        (
+          SELECT inbound_message.metadata->>'route_reason'
+          FROM mail_messages inbound_message
+          WHERE inbound_message.thread_id = mt.id
+            AND inbound_message.direction = 'inbound'
+          ORDER BY inbound_message.created_at DESC NULLS LAST, inbound_message.id DESC
+          LIMIT 1
+        ) AS route_reason,
+        EXISTS (
+          SELECT 1
+          FROM mail_messages failed_message
+          WHERE failed_message.thread_id = mt.id AND failed_message.status = 'failed'
+        ) AS needs_attention
       FROM mail_threads mt
       JOIN mailboxes mb ON mb.id = mt.mailbox_id
       WHERE mt.id = ${threadId}
@@ -141,6 +189,10 @@ export const handler = async (event: any) => {
         contact_email: threadRow.contact_email,
         contact_name: threadRow.contact_name,
         mailbox: threadRow.mailbox,
+        received_at: threadRow.received_at,
+        handled_by: threadRow.handled_by,
+        route_reason: threadRow.route_reason,
+        needs_attention: Boolean(threadRow.needs_attention),
         last_message_at: threadRow.last_message_at,
         unread: false,
       },

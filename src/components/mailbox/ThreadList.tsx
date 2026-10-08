@@ -1,5 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, RefreshCw } from 'lucide-react';
-import type { EmailListItem, ThreadItem } from '../../services/mailboxApi';
+import type { EmailListItem, ThreadFilter, ThreadItem } from '../../services/mailboxApi';
 
 function formatRelativeTime(value: string | null) {
   if (!value) return 'just now';
@@ -62,7 +62,7 @@ export function ThreadList({
   selectedMailboxLabel: string;
   totalThreads?: number;
   searchTerm: string;
-  filter: 'all' | 'unread' | 'replied';
+  filter: ThreadFilter;
   agentFilter: string;
   agentOptions: string[];
   onSearchChange: (value: string) => void;
@@ -215,6 +215,7 @@ export function ThreadList({
               const preview = email?.preview || conversation?.preview || 'No preview available.';
               const timestamp = email?.created_at || conversation?.last_message_at;
               const mailbox = email?.mailbox || conversation?.mailbox || '';
+              const needsAttention = Boolean(conversation?.needs_attention);
               const chips = email
                 ? [
                     ...(folder === 'sent' && agent ? [{ label: 'Agent', value: agent }] : []),
@@ -255,6 +256,7 @@ export function ThreadList({
                           {chipItem.value}
                         </span>
                       ))}
+                      {needsAttention ? <span title="Needs attention" className={`inline-flex max-w-28 truncate items-center rounded border px-1.5 py-0.5 text-[9px] font-medium ${isDark ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>Needs attention</span> : null}
                     </span>
                     <span className={`mailbox-time whitespace-nowrap text-right text-[10px] ${muted}`} title={timestamp ? new Date(timestamp).toLocaleString() : ''}>{shortTime || formatRelativeTime(timestamp)}</span>
                     <div className="mailbox-stacked-content min-w-0">
@@ -265,6 +267,7 @@ export function ThreadList({
                       <div className={`mt-1 truncate text-[13px] ${unread ? strong : soft}`}><strong>{subject}</strong><span className={muted}> — {preview}</span></div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
                         {chips.slice(0, 2).map((chipItem) => <span key={`${id}-${chipItem.label}`} className={`inline-flex max-w-full truncate items-center rounded border px-1.5 py-0.5 text-[9px] font-medium ${badgeTone}`}>{chipItem.value}</span>)}
+                        {needsAttention ? <span className={`inline-flex max-w-full truncate items-center rounded border px-1.5 py-0.5 text-[9px] font-medium ${isDark ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>Needs attention</span> : null}
                         <span className={`max-w-full truncate text-[9px] ${muted}`}>{mailbox}</span>
                       </div>
                     </div>
@@ -278,7 +281,7 @@ export function ThreadList({
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center">
             <div>
-              <div className={`text-lg font-semibold ${strong}`}>{folder === 'all' ? 'No conversations yet' : 'No emails yet'}</div>
+              <div className={`text-lg font-semibold ${strong}`}>{filter === 'needs_attention' ? 'No conversations need attention' : folder === 'all' ? 'No conversations yet' : 'No emails yet'}</div>
               <div className={`mt-2 text-sm ${muted}`}>Try a different inbox or search query.</div>
               {searchTerm || filter !== 'all' || agentFilter !== 'all' ? (
                 <button type="button" onClick={() => { onSearchChange(''); onFilterChange('all'); onAgentFilterChange('all'); }} className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-700">

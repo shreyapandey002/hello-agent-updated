@@ -1,7 +1,7 @@
-import { ChevronDown, Inbox, Mail, PanelLeftClose, PanelLeftOpen, Settings, Sparkles } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Inbox, Mail, PanelLeftClose, PanelLeftOpen, Settings, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from '../../context/AuthContext';
-import type { Mailbox as MailboxType } from '../../services/mailboxApi';
+import type { Mailbox as MailboxType, ThreadFilter } from '../../services/mailboxApi';
 
 function readStoredExpandedGroups(selectedMailbox: string, mailboxes: MailboxType[]) {
   const defaultExpanded: Record<string, boolean> = {
@@ -32,6 +32,7 @@ export function Sidebar({
   onSelectMailbox,
   onSelectFolder,
   selectedFolder,
+  selectedFilter,
   allInboxCounts,
   onLogout,
   isDark,
@@ -43,9 +44,10 @@ export function Sidebar({
   unreadTotal: number;
   user: User | null;
   onSelectMailbox: (address: string) => void;
-  onSelectFolder: (folder: 'all' | 'incoming' | 'sent', mailbox: string) => void;
+  onSelectFolder: (folder: 'all' | 'incoming' | 'sent' | 'needs_attention', mailbox: string) => void;
   selectedFolder: 'all' | 'incoming' | 'sent';
-  allInboxCounts: { incoming_count: number; sent_count: number; total_count: number };
+  selectedFilter: ThreadFilter;
+  allInboxCounts: { incoming_count: number; sent_count: number; total_count: number; needs_attention_count: number };
   onLogout: () => void;
   isDark: boolean;
   isCollapsed: boolean;
@@ -57,6 +59,7 @@ export function Sidebar({
   const subtleText = isDark ? 'text-slate-400' : 'text-slate-500';
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600';
   const chip = isDark ? 'bg-slate-700 text-slate-100' : 'bg-slate-200 text-slate-700';
+  const attentionChip = isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-800';
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => readStoredExpandedGroups(selectedMailbox, mailboxes));
 
   useEffect(() => {
@@ -95,6 +98,7 @@ export function Sidebar({
       { key: 'all', label: 'All conversations', count: counts.total_count },
       { key: 'incoming', label: 'Incoming emails', count: counts.incoming_count },
       { key: 'sent', label: 'Sent emails', count: counts.sent_count },
+      { key: 'needs_attention', label: 'Needs Attention', count: counts.needs_attention_count },
     ] as const;
     const isSelected = groupKey === 'all' ? selectedMailbox === 'all' : selectedMailbox === mailboxAddress;
     const isExpanded = Boolean(expandedGroups[groupKey]);
@@ -143,8 +147,9 @@ export function Sidebar({
           <div className="mt-1 space-y-1 pl-3">
             {folderItems.map((folder) => {
               const isActive = groupKey === 'all'
-                ? selectedMailbox === 'all' && selectedFolder === folder.key
-                : selectedMailbox === mailboxAddress && selectedFolder === folder.key;
+                ? selectedMailbox === 'all' && (folder.key === 'needs_attention' ? selectedFilter === 'needs_attention' : selectedFolder === folder.key && selectedFilter !== 'needs_attention')
+                : selectedMailbox === mailboxAddress && (folder.key === 'needs_attention' ? selectedFilter === 'needs_attention' : selectedFolder === folder.key && selectedFilter !== 'needs_attention');
+              const folderCount = folder.count;
 
               return (
                 <button
@@ -160,7 +165,7 @@ export function Sidebar({
                   className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition ${isActive ? (isDark ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900') : `${rowBase} ${mutedText}`}`}
                 >
                   <span className="min-w-0 break-words">{folder.label}</span>
-                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${chip}`}>{folder.count}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${folder.key === 'needs_attention' ? attentionChip : chip}`}>{folderCount}</span>
                 </button>
               );
             })}
@@ -201,6 +206,21 @@ export function Sidebar({
               {unreadTotal > 0 ? (
                 <span className={`absolute -right-1 -top-1 rounded-full px-1 py-0.5 text-[8px] font-semibold ${chip}`}>
                   {unreadTotal > 99 ? '99+' : unreadTotal}
+                </span>
+              ) : null}
+            </button>
+
+            <button
+              type="button"
+              title="Needs Attention"
+              aria-label="Needs Attention"
+              onClick={() => onSelectFolder('needs_attention', 'all')}
+              className={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border ${selectedFilter === 'needs_attention' ? (isDark ? 'border-amber-500/40 bg-amber-500/15 text-amber-300' : 'border-amber-300 bg-amber-100 text-amber-800') : (isDark ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')}`}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {allInboxCounts.needs_attention_count > 0 ? (
+                <span className={`absolute -right-1 -top-1 rounded-full px-1 py-0.5 text-[8px] font-semibold ${attentionChip}`}>
+                  {allInboxCounts.needs_attention_count > 99 ? '99+' : allInboxCounts.needs_attention_count}
                 </span>
               ) : null}
             </button>
@@ -280,6 +300,7 @@ export function Sidebar({
               incoming_count: mailbox.incoming_count,
               sent_count: mailbox.sent_count,
               total_count: mailbox.thread_count,
+              needs_attention_count: mailbox.needs_attention_count,
             },
           ))}
         </div>

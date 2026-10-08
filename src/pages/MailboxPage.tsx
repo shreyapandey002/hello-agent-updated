@@ -6,7 +6,7 @@ import { ThreadList } from '../components/mailbox/ThreadList';
 import { ThreadView } from '../components/mailbox/ThreadView';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../ThemeContext';
-import { getEmailMessage, getMailboxes, getThread, getThreads, type EmailListItem, type Mailbox, type MessageItem, type ThreadDetails, type ThreadItem } from '../services/mailboxApi';
+import { getEmailMessage, getMailboxes, getThread, getThreads, type EmailListItem, type Mailbox, type MessageItem, type ThreadDetails, type ThreadFilter, type ThreadItem } from '../services/mailboxApi';
 
 const DEFAULT_SIDEBAR_WIDTH = 280;
 const DEFAULT_LIST_WIDTH = 440;
@@ -56,7 +56,7 @@ export default function MailboxPage() {
   const mailboxQuery = searchParams.get('mailbox') || 'all';
   const searchTerm = searchParams.get('q') || '';
   const filterValue = searchParams.get('filter');
-  const filter: 'all' | 'unread' | 'replied' = filterValue === 'unread' || filterValue === 'replied'
+  const filter: ThreadFilter = filterValue === 'unread' || filterValue === 'replied' || filterValue === 'needs_attention'
     ? filterValue
     : 'all';
   const folderValue = searchParams.get('folder');
@@ -216,11 +216,14 @@ export default function MailboxPage() {
     incoming_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.incoming_count, 0),
     sent_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.sent_count, 0),
     total_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.thread_count, 0),
+    needs_attention_count: mailboxes.reduce((sum, mailbox) => sum + mailbox.needs_attention_count, 0),
   }), [mailboxes]);
   const selectedMailboxCounts = mailboxQuery === 'all'
     ? allInboxCounts
     : mailboxes.find((mailbox) => mailbox.address === mailboxQuery) || allInboxCounts;
-  const selectedFolderCount = folder === 'incoming'
+  const selectedFolderCount = filter === 'needs_attention'
+    ? selectedMailboxCounts.needs_attention_count
+    : folder === 'incoming'
     ? selectedMailboxCounts.incoming_count
     : folder === 'sent'
       ? selectedMailboxCounts.sent_count
@@ -254,7 +257,7 @@ export default function MailboxPage() {
         const data = await getThreads({
           mailbox: mailboxQuery,
           q: searchTerm,
-          filter: filter === 'unread' ? 'unread' : 'all',
+          filter: filter === 'replied' ? 'all' : filter,
           folder,
         });
         if (!active || requestId !== latestRequest) return;
@@ -368,12 +371,16 @@ export default function MailboxPage() {
     navigate(queryString ? `/mailbox?${queryString}` : '/mailbox');
   };
 
-  const handleSelectFolder = (value: 'all' | 'incoming' | 'sent', mailbox: string) => {
+  const handleSelectFolder = (value: 'all' | 'incoming' | 'sent' | 'needs_attention', mailbox: string) => {
     const nextParams = new URLSearchParams();
     if (mailbox !== 'all') nextParams.set('mailbox', mailbox);
     if (searchTerm) nextParams.set('q', searchTerm);
-    if (filter !== 'all') nextParams.set('filter', filter);
-    if (value !== 'all') nextParams.set('folder', value);
+    if (value === 'needs_attention') {
+      nextParams.set('filter', 'needs_attention');
+    } else {
+      if (filter !== 'all' && filter !== 'needs_attention') nextParams.set('filter', filter);
+      if (value !== 'all') nextParams.set('folder', value);
+    }
     const queryString = nextParams.toString();
     navigate(queryString ? `/mailbox?${queryString}` : '/mailbox');
   };
@@ -442,7 +449,9 @@ export default function MailboxPage() {
     ? 'Incoming emails'
     : folder === 'sent'
       ? 'Sent emails'
-      : 'All conversations';
+      : filter === 'needs_attention'
+        ? 'Needs Attention'
+        : 'All conversations';
   const mobileListLayout = isMobileLayout && !selectedThreadId;
   const sidebarPaneWidth = sidebarCollapsed ? 64 : sidebarWidth;
 
@@ -627,6 +636,7 @@ export default function MailboxPage() {
               onSelectMailbox={handleSelectMailbox}
               onSelectFolder={handleSelectFolder}
               selectedFolder={folder}
+              selectedFilter={filter}
               allInboxCounts={allInboxCounts}
               onLogout={handleLogout}
               isDark={isDark}
