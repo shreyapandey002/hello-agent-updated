@@ -53,6 +53,13 @@ export const handler = async (event: any) => {
       if (filter === 'unread') {
         emailConditions.push(sql`mt.unread = true`);
       }
+      if (filter === 'needs_attention') {
+        emailConditions.push(sql`EXISTS (
+          SELECT 1
+          FROM mail_messages failed_message
+          WHERE failed_message.thread_id = mt.id AND failed_message.status = 'failed'
+        )`);
+      }
       if (q) {
         emailConditions.push(sql`(
           mm.subject ILIKE ${searchPattern} OR
@@ -127,6 +134,14 @@ export const handler = async (event: any) => {
       filterConditions.push(sql`mt.unread = true`);
     }
 
+    if (filter === 'needs_attention') {
+      filterConditions.push(sql`EXISTS (
+        SELECT 1
+        FROM mail_messages failed_message
+        WHERE failed_message.thread_id = mt.id AND failed_message.status = 'failed'
+      )`);
+    }
+
     if (q !== '') {
       filterConditions.push(sql`(
         mt.subject ILIKE ${searchPattern} OR
@@ -168,11 +183,33 @@ export const handler = async (event: any) => {
         mt.unread,
         mt.last_message_at,
         mb.address AS mailbox,
+        mb.address AS received_at,
         COALESCE(mc.message_count, 0) AS message_count,
         lm.last_direction,
         lm.last_status,
         lm.last_agent,
-        lm.last_body_text
+        lm.last_body_text,
+        (
+          SELECT routed_message.agent_name
+          FROM mail_messages routed_message
+          WHERE routed_message.thread_id = mt.id
+            AND routed_message.agent_name IS NOT NULL
+          ORDER BY routed_message.created_at DESC NULLS LAST, routed_message.id DESC
+          LIMIT 1
+        ) AS handled_by,
+        (
+          SELECT inbound_message.metadata->>'route_reason'
+          FROM mail_messages inbound_message
+          WHERE inbound_message.thread_id = mt.id
+            AND inbound_message.direction = 'inbound'
+          ORDER BY inbound_message.created_at DESC NULLS LAST, inbound_message.id DESC
+          LIMIT 1
+        ) AS route_reason,
+        EXISTS (
+          SELECT 1
+          FROM mail_messages failed_message
+          WHERE failed_message.thread_id = mt.id AND failed_message.status = 'failed'
+        ) AS needs_attention
       FROM mail_threads mt
       JOIN mailboxes mb ON mb.id = mt.mailbox_id
       LEFT JOIN (
@@ -195,10 +232,14 @@ export const handler = async (event: any) => {
         unread: Boolean(row.unread),
         last_message_at: row.last_message_at,
         mailbox: row.mailbox,
+        received_at: row.received_at,
         message_count: Number(row.message_count || 0),
         last_direction: row.last_direction,
         last_status: row.last_status,
         last_agent: row.last_agent,
+        handled_by: row.handled_by,
+        route_reason: row.route_reason,
+        needs_attention: Boolean(row.needs_attention),
         preview: buildWordBoundedPreview(row.last_body_text),
       })),
     });
@@ -209,4 +250,3 @@ export const handler = async (event: any) => {
     });
   }
 };
-

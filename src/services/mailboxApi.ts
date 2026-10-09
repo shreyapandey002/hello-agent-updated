@@ -6,7 +6,10 @@ export type Mailbox = {
   incoming_count: number;
   sent_count: number;
   thread_count: number;
+  needs_attention_count: number;
 };
+
+export type ThreadFilter = 'all' | 'unread' | 'replied' | 'needs_attention';
 
 export type ThreadItem = {
   id: number;
@@ -20,6 +23,10 @@ export type ThreadItem = {
   last_direction: string | null;
   last_status: string | null;
   last_agent: string | null;
+  received_at: string | null;
+  handled_by: string | null;
+  route_reason: string | null;
+  needs_attention: boolean;
   preview: string;
 };
 
@@ -64,6 +71,10 @@ export type ThreadDetails = {
   contact_email: string | null;
   contact_name: string | null;
   mailbox: string;
+  received_at: string | null;
+  handled_by: string | null;
+  route_reason: string | null;
+  needs_attention: boolean;
   last_message_at: string | null;
   unread: boolean;
 };
@@ -107,11 +118,11 @@ async function fetchJsonResponse<T>(url: string, init?: RequestInit): Promise<T>
   return data as T;
 }
 
-export async function getMailboxes(): Promise<{ mailboxes: Mailbox[]; all_inboxes?: { incoming_count: number; sent_count: number; total_count: number } }> {
+export async function getMailboxes(): Promise<{ mailboxes: Mailbox[]; all_inboxes?: { incoming_count: number; sent_count: number; total_count: number; needs_attention_count: number } }> {
   return fetchJson('/api/mailboxes', { method: 'GET' });
 }
 
-export async function getThreads(params: { mailbox?: string; q?: string; filter?: 'all' | 'unread'; folder?: 'all' | 'incoming' | 'sent' }): Promise<{ threads?: ThreadItem[]; emails?: EmailListItem[] }> {
+export async function getThreads(params: { mailbox?: string; q?: string; filter?: ThreadFilter; folder?: 'all' | 'incoming' | 'sent' }): Promise<{ threads?: ThreadItem[]; emails?: EmailListItem[] }> {
   const query = new URLSearchParams();
 
   if (params.mailbox && params.mailbox !== 'all') {
