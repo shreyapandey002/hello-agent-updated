@@ -281,9 +281,9 @@ export function ThreadList({
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center">
             <div>
-              <div className={`text-lg font-semibold ${strong}`}>{filter === 'needs_attention' ? 'No conversations need attention' : folder === 'all' ? 'No conversations yet' : 'No emails yet'}</div>
-              <div className={`mt-2 text-sm ${muted}`}>Try a different inbox or search query.</div>
-              {searchTerm || filter !== 'all' || agentFilter !== 'all' ? (
+              <div className={`text-lg font-semibold ${strong}`}>{filter === 'needs_attention' ? 'All clear' : folder === 'all' ? 'No conversations yet' : 'No emails yet'}</div>
+              <div className={`mt-2 text-sm ${muted}`}>{filter === 'needs_attention' ? 'No failed or unhandled emails in this inbox.' : 'Try a different inbox or search query.'}</div>
+              {filter !== 'needs_attention' && (searchTerm || filter !== 'all' || agentFilter !== 'all') ? (
                 <button type="button" onClick={() => { onSearchChange(''); onFilterChange('all'); onAgentFilterChange('all'); }} className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-700">
                   Reset filters
                 </button>

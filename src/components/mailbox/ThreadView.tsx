@@ -230,9 +230,10 @@ export function ThreadView({
   }, [activeTab]);
 
   const detailMessage = [...orderedMessages].reverse().find((message) => expandedIds.has(message.id)) || orderedMessages[orderedMessages.length - 1];
-  const routingSummary = [
+  const threadSummary = [
     thread?.received_at ? `Received at ${thread.received_at}` : null,
     thread?.handled_by ? `Handled by ${thread.handled_by}` : null,
+    `${orderedMessages.length} messages`,
   ].filter((value): value is string => Boolean(value)).join(' · ');
   const copyDetailValue = async (key: string, value: string) => {
     try {
@@ -309,7 +310,7 @@ export function ThreadView({
           </button>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold" title={orderedMessages[0]?.subject || thread.subject || 'No subject'}>{orderedMessages[0]?.subject || thread.subject || 'No subject'}</div>
-            {routingSummary ? <div className={`truncate text-[10px] ${soft}`} title={routingSummary}>{routingSummary}</div> : null}
+            {threadSummary ? <div className={`truncate text-[10px] ${soft}`} title={threadSummary}>{threadSummary}</div> : null}
           </div>
           <div className={`flex shrink-0 items-center rounded-full border p-0.5 ${isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-100'}`} role="tablist" aria-label="Message view">
             {(['Rendered', 'Text', 'Headers'] as const).map((tab) => (
@@ -566,11 +567,6 @@ export function ThreadView({
                 <div><dt className={soft}>To</dt><dd className={`mt-0.5 break-all ${strong}`}>{detailMessage.to_addr || 'Unknown recipient'}</dd></div>
                 <div><dt className={soft}>At</dt><dd className={`mt-0.5 ${strong}`}>{formatDetailedMessageTime(detailMessage.created_at)}</dd></div>
               </dl>
-            </section>
-            <section className={`border-b py-4 ${border}`}>
-              <h3 className={`mb-3 text-xs font-semibold ${strong}`}>Handled by</h3>
-              <div className={`text-xs ${strong}`}>{detailMessage.direction === 'inbound' ? 'Customer' : (detailMessage.agent_name || 'Hello Agent')}</div>
-              <div className={`mt-1 text-[11px] ${soft}`}>{detailMessage.metadata?.source === 'website_form' ? 'Website form' : 'Email'}</div>
             </section>
             <section className={`border-b py-4 ${border}`}>
               <h3 className={`mb-3 text-xs font-semibold ${strong}`}>Routing</h3>
